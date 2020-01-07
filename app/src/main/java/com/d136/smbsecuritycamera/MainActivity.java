@@ -53,7 +53,7 @@ public class MainActivity extends AppCompatActivity {
     private EditText editIPv4, editPort, editUser, editPassword;
     private Button btnConnect, btnRecord;
     private TextView textStatus;
-    private String ip, port, user, password, status="Unknown", shareName = "VideoRecorded";
+    private String ip, port, user, password, shareName = "VideoRecorded";
     private smbConnection smbConnection;
 
     //Video recording
@@ -64,6 +64,7 @@ public class MainActivity extends AppCompatActivity {
     private SurfaceView preview;
     private MotionDetector motionDetector;
     private int time = 120;
+    private boolean serviceStarted = false;
 
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
@@ -79,11 +80,11 @@ public class MainActivity extends AppCompatActivity {
         editPassword = findViewById(R.id.editPassword);
         btnConnect = findViewById(R.id.btnConnect);
         btnRecord = findViewById(R.id.btnRecord);
-        preview = findViewById(R.id.camera_preview);
         textStatus = findViewById(R.id.textStatus);
-
+        preview = findViewById(R.id.camera_preview);
 
         initRoutine();
+
 
         //Actions
         btnConnect.setOnClickListener(new View.OnClickListener() {
@@ -106,7 +107,7 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 if(checkCameraHardware(MainActivity.this)) {
                     btnRecord.setText("SERVICE STARTED");
-                    motionDetector.onResume();
+                    motionDetectorCallback();
                 }
                 else
                     Log.e(TAG,"Device is not supported!");
@@ -210,6 +211,7 @@ public class MainActivity extends AppCompatActivity {
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
+                    motionDetector.onResume();
                     recording = false;
                 }
             }, time*1000);
@@ -235,10 +237,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void prepareVideoRecorder(){
         // Step 1: Unlock and set camera to MediaRecorder
-        camera = getCameraInstance();
         recorder = new MediaRecorder();
-        motionDetector.onPause();
-        camera = getCameraInstance();
+        motionDetector.releaseCamera();
 
         camera.unlock();
         recorder.setCamera(camera);
@@ -282,6 +282,31 @@ public class MainActivity extends AppCompatActivity {
 
 
     //Activity managing
+    void initRoutine() {
+        serviceStarted = true;
+        camera = getCameraInstance();
+        motionDetector = new MotionDetector(this, preview, camera);
+    }
+
+    void motionDetectorCallback(){
+        motionDetector.setMotionDetectorCallback(new MotionDetectorCallback() {
+            @RequiresApi(api = Build.VERSION_CODES.KITKAT)
+            @Override    public void onMotionDetected() {
+                try {
+                    if (smbConnection.isConnected()){
+                        btnRecord.setText("RECORDING");
+                        record();
+                    }
+                }catch(NullPointerException ignored){}
+                Log.w(TAG,"Motion detected");
+            }
+
+            @Override
+            public void onTooDark() {
+                Log.w(TAG,"Too dark here");
+            }
+        });
+    }
 
     @Override
     protected void onPause() {
@@ -292,28 +317,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-    }
-
-    void initRoutine() {
-        motionDetector = new MotionDetector(this, preview);
-        motionDetector.setMotionDetectorCallback(new MotionDetectorCallback() {
-            @RequiresApi(api = Build.VERSION_CODES.KITKAT)
-            @Override    public void onMotionDetected() {
-                Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-                Objects.requireNonNull(v).vibrate(80);
-                try {
-                    if (smbConnection.isConnected())
-                        btnRecord.setText("RECORDING");
-                        record();
-                }catch(NullPointerException ignored){}
-                Log.w(TAG,"Motion detected");
-            }
-
-            @Override
-            public void onTooDark() {
-                Log.w(TAG,"Too dark here");
-            }
-        });
+        if(serviceStarted)
+            motionDetector.onResume();
     }
 
     @Override

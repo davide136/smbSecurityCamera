@@ -85,10 +85,11 @@ public class MotionDetector {
     private Context mContext;
     private SurfaceView mSurface;
 
-    public MotionDetector(Context context, SurfaceView previewSurface) {
+    public MotionDetector(Context context, SurfaceView previewSurface, Camera camera) {
         detector = new AggregateLumaMotionDetection();
         mContext = context;
         mSurface = previewSurface;
+        mCamera = camera;
     }
 
     public void setMotionDetectorCallback(MotionDetectorCallback motionDetectorCallback) {
@@ -139,14 +140,7 @@ public class MotionDetector {
 
 
     private Camera getCameraInstance(){
-        Camera c = null;
-        try {
-            c = Camera.open(); // attempt to get a Camera instance
-        }
-        catch (Exception e){
-            Log.e(TAG,"Camera is not available (in use or does not exist");
-        }
-        return c; // returns null if camera is unavailable
+        return mCamera;
     }
 
     private Camera.PreviewCallback previewCallback = new Camera.PreviewCallback() {
@@ -229,6 +223,7 @@ public class MotionDetector {
         releaseCamera();
         if (previewHolder != null) previewHolder.removeCallback(surfaceCallback);
         if (worker != null) worker.stopDetection();
+        releaseCamera();
     }
 
     public void releaseCamera(){
@@ -236,7 +231,7 @@ public class MotionDetector {
             mCamera.setPreviewCallback(null);
             if (inPreview) mCamera.stopPreview();
             inPreview = false;
-            mCamera.release();        // release the camera for other applications
+            mCamera.lock();        // release the camera for other applications
             mCamera = null;
         }
     }
