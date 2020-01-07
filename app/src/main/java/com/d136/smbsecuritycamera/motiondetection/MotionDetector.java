@@ -66,6 +66,7 @@ public class MotionDetector {
         }
     }
 
+    private static final String TAG="MotionDetectorClass";
     private final AggregateLumaMotionDetection detector;
     private long checkInterval = 500;
     private long lastCheck = 0;
@@ -84,11 +85,10 @@ public class MotionDetector {
     private Context mContext;
     private SurfaceView mSurface;
 
-    public MotionDetector(Context context, SurfaceView previewSurface, Camera camera) {
+    public MotionDetector(Context context, SurfaceView previewSurface) {
         detector = new AggregateLumaMotionDetection();
         mContext = context;
         mSurface = previewSurface;
-        mCamera = camera;
     }
 
     public void setMotionDetectorCallback(MotionDetectorCallback motionDetectorCallback) {
@@ -137,8 +137,16 @@ public class MotionDetector {
         }
     }
 
+
     private Camera getCameraInstance(){
-        return mCamera;
+        Camera c = null;
+        try {
+            c = Camera.open(); // attempt to get a Camera instance
+        }
+        catch (Exception e){
+            Log.e(TAG,"Camera is not available (in use or does not exist");
+        }
+        return c; // returns null if camera is unavailable
     }
 
     private Camera.PreviewCallback previewCallback = new Camera.PreviewCallback() {

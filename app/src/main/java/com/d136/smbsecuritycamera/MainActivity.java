@@ -58,7 +58,7 @@ public class MainActivity extends AppCompatActivity {
 
     //Video recording
     private MediaRecorder recorder;
-    boolean recording = false;
+    private boolean recording = false;
     private java.io.File tmpVideo;
     private Camera camera;
     private SurfaceView preview;
@@ -70,8 +70,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        //set mute
-        ((AudioManager) Objects.requireNonNull(this.getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_SYSTEM,true);
         setContentView(R.layout.activity_main);
 
         //init layout
@@ -85,7 +83,7 @@ public class MainActivity extends AppCompatActivity {
         textStatus = findViewById(R.id.textStatus);
 
 
-
+        initRoutine();
 
         //Actions
         btnConnect.setOnClickListener(new View.OnClickListener() {
@@ -106,14 +104,16 @@ public class MainActivity extends AppCompatActivity {
         btnRecord.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(checkCameraHardware(MainActivity.this))
-//                    record();
-                    initRoutine();
+                if(checkCameraHardware(MainActivity.this)) {
+                    btnRecord.setText("SERVICE STARTED");
+                    motionDetector.onResume();
+                }
                 else
                     Log.e(TAG,"Device is not supported!");
             }
         });
     }
+
 
 
 
@@ -189,6 +189,8 @@ public class MainActivity extends AppCompatActivity {
 
 
 
+
+
     // Camera and recording
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     private void record() {
@@ -233,8 +235,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void prepareVideoRecorder(){
         // Step 1: Unlock and set camera to MediaRecorder
-
-        motionDetector.releaseCamera();
+        camera = getCameraInstance();
+        recorder = new MediaRecorder();
+        motionDetector.onPause();
         camera = getCameraInstance();
 
         camera.unlock();
@@ -289,16 +292,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-
-//        initRoutine();
     }
 
-    private void initRoutine() {
-        btnRecord.setText("SERVICE STARTED");
-        camera = getCameraInstance();
-        recorder = new MediaRecorder();
-        motionDetector = new MotionDetector(this, preview, camera);
-        motionDetector.onResume();
+    void initRoutine() {
+        motionDetector = new MotionDetector(this, preview);
         motionDetector.setMotionDetectorCallback(new MotionDetectorCallback() {
             @RequiresApi(api = Build.VERSION_CODES.KITKAT)
             @Override    public void onMotionDetected() {
@@ -312,7 +309,8 @@ public class MainActivity extends AppCompatActivity {
                 Log.w(TAG,"Motion detected");
             }
 
-            @Override    public void onTooDark() {
+            @Override
+            public void onTooDark() {
                 Log.w(TAG,"Too dark here");
             }
         });
