@@ -63,7 +63,7 @@ public class MainActivity extends AppCompatActivity {
     private Camera camera;
     private SurfaceView preview;
     private MotionDetector motionDetector;
-    private int time = 120;
+    private int time = 5;
     private boolean serviceStarted = false;
 
 
@@ -106,7 +106,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 if(checkCameraHardware(MainActivity.this)) {
-                    btnRecord.setText("SERVICE STARTED");
+                    btnRecord.setText("SERVICE RUNNING");
                     motionDetectorCallback();
                 }
                 else
@@ -204,13 +204,14 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void run() {
                     recorder.stop();
-                    releaseMediaRecorder();
-                    initRoutine();
+                    releaseMediaRecorder();//clear preparing
+                    initRoutine(); // resetted motiondetector
                     try {
                         copyToSMB();
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
+                    btnRecord.setText("SERVICE RUNNING");
                     motionDetector.onResume();
                     recording = false;
                 }
@@ -272,8 +273,8 @@ public class MainActivity extends AppCompatActivity {
     private void releaseMediaRecorder(){
         if (recorder != null) {
             recorder.reset();   // clear recorder configuration
-            recorder.release(); // release the recorder object
-            recorder = null;
+//            recorder.release(); // release the recorder object
+//            recorder = null;
 //            camera.lock();           // lock camera for later use
         }
     }
@@ -284,7 +285,8 @@ public class MainActivity extends AppCompatActivity {
     //Activity managing
     void initRoutine() {
         serviceStarted = true;
-        camera = getCameraInstance();
+        if(camera==null)
+            camera = getCameraInstance();
         motionDetector = new MotionDetector(this, preview, camera);
     }
 
@@ -293,7 +295,7 @@ public class MainActivity extends AppCompatActivity {
             @RequiresApi(api = Build.VERSION_CODES.KITKAT)
             @Override    public void onMotionDetected() {
                 try {
-                    if (smbConnection.isConnected()){
+                    if (smbConnection.isConnected() & !recording ){
                         btnRecord.setText("RECORDING");
                         record();
                     }
@@ -324,6 +326,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+
+        releaseMediaRecorder();
         motionDetector.releaseCamera();
+        camera.release();
     }
 }
