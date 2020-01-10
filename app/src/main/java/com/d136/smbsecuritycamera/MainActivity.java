@@ -123,7 +123,7 @@ public class MainActivity extends AppCompatActivity {
     @RequiresApi(api = Build.VERSION_CODES.KITKAT) //SISTEMARE IP PRIMA DELLA RELEASE
     private void connect() {
 //        ip = editIPv4.getText().toString();
-        ip = "192.168.1.9";
+        ip = "192.168.1.202";
         port = editPort.getText().toString();
         user = editUser.getText().toString();
         password = editPassword.getText().toString();
@@ -199,11 +199,34 @@ public class MainActivity extends AppCompatActivity {
             recording = true;
             prepareVideoRecorder();
             recorder.start();
+
+
+
             Handler handler = new Handler();
             handler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
-                    recorder.stop();
+
+                    new Thread("STOP_RECORDER") {
+                        public void run() {
+                            Log.d(TAG, "Stopping recorder...");
+                            recorder.stop();
+
+                            releaseMediaRecorder();//clear preparing
+                            initRoutine(); // resetted motiondetector
+                            try {
+                                copyToSMB();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                            btnRecord.setText("SERVICE RUNNING");
+                            motionDetector.onResume();
+                            recording = false;
+                            Log.d(TAG, "Recorder successfully stopped");
+                        }
+                    }.start();
+
+                   /* recorder.stop();
                     releaseMediaRecorder();//clear preparing
                     initRoutine(); // resetted motiondetector
                     try {
@@ -213,7 +236,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                     btnRecord.setText("SERVICE RUNNING");
                     motionDetector.onResume();
-                    recording = false;
+                    recording = false;*/
                 }
             }, time*1000);
         }
@@ -273,8 +296,8 @@ public class MainActivity extends AppCompatActivity {
     private void releaseMediaRecorder(){
         if (recorder != null) {
             recorder.reset();   // clear recorder configuration
-//            recorder.release(); // release the recorder object
-//            recorder = null;
+            recorder.release(); // release the recorder object
+            recorder = null;
 //            camera.lock();           // lock camera for later use
         }
     }
