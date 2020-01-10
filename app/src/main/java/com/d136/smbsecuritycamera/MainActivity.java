@@ -1,6 +1,7 @@
 package com.d136.smbsecuritycamera;
 
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -11,8 +12,8 @@ import android.media.MediaRecorder;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Vibrator;
 import android.util.Log;
+import android.view.Surface;
 import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Button;
@@ -41,7 +42,6 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.Set;
 
 
@@ -123,7 +123,7 @@ public class MainActivity extends AppCompatActivity {
     @RequiresApi(api = Build.VERSION_CODES.KITKAT) //SISTEMARE IP PRIMA DELLA RELEASE
     private void connect() {
 //        ip = editIPv4.getText().toString();
-        ip = "192.168.1.202";
+        ip = "192.168.1.9";
         port = editPort.getText().toString();
         user = editUser.getText().toString();
         password = editPassword.getText().toString();
@@ -200,47 +200,17 @@ public class MainActivity extends AppCompatActivity {
             prepareVideoRecorder();
             recorder.start();
 
-
-
             Handler handler = new Handler();
             handler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
-
-                    new Thread("STOP_RECORDER") {
-                        public void run() {
-                            Log.d(TAG, "Stopping recorder...");
-                            recorder.stop();
-
-                            releaseMediaRecorder();//clear preparing
-                            initRoutine(); // resetted motiondetector
-                            try {
-                                copyToSMB();
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                            btnRecord.setText("SERVICE RUNNING");
-                            motionDetector.onResume();
-                            recording = false;
-                            Log.d(TAG, "Recorder successfully stopped");
-                        }
-                    }.start();
-
-                   /* recorder.stop();
-                    releaseMediaRecorder();//clear preparing
-                    initRoutine(); // resetted motiondetector
-                    try {
-                        copyToSMB();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    btnRecord.setText("SERVICE RUNNING");
-                    motionDetector.onResume();
-                    recording = false;*/
+                    stopRecorder();
                 }
             }, time*1000);
         }
     }
+
+
 
     /** Check if this device has a camera */
     private boolean checkCameraHardware(Context context) {
@@ -285,23 +255,44 @@ public class MainActivity extends AppCompatActivity {
             recorder.prepare();
         } catch (IllegalStateException e) {
             Log.d(TAG, "IllegalStateException preparing MediaRecorder: " + e.getMessage());
-            releaseMediaRecorder();
+            resetMediaRecorder();
         } catch (IOException e) {
             Log.d(TAG, "IOException preparing MediaRecorder: " + e.getMessage());
-            releaseMediaRecorder();
+            resetMediaRecorder();
         }
 
     }
 
-    private void releaseMediaRecorder(){
+    private void resetMediaRecorder(){
         if (recorder != null) {
             recorder.reset();   // clear recorder configuration
-            recorder.release(); // release the recorder object
-            recorder = null;
-//            camera.lock();           // lock camera for later use
         }
     }
 
+    private void resetCamera() throws IOException {
+        camera.reconnect();
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
+    public void stopRecorder() {
+        recorder.stop();
+        resetMediaRecorder();//clear preparing
+
+        try {
+            resetCamera();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        try {
+            copyToSMB();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        initRoutine(); // resetted motiondetector
+        btnRecord.setText("SERVICE RUNNING");
+        motionDetector.onResume();
+        recording = false;
+    }
 
 
 
@@ -310,6 +301,7 @@ public class MainActivity extends AppCompatActivity {
         serviceStarted = true;
         if(camera==null)
             camera = getCameraInstance();
+        motionDetector = null;
         motionDetector = new MotionDetector(this, preview, camera);
     }
 
@@ -336,22 +328,43 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
+        enableAudio();
         motionDetector.onPause();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        disableAudio();
         if(serviceStarted)
             motionDetector.onResume();
+    }
+
+    private void enableAudio(){
+        // re-enable sound after recording.
+        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_ALARM,false);
+        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_DTMF,false);
+        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_MUSIC,false);
+        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_RING,false);
+        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_SYSTEM,false);
+        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_VOICE_CALL,false);
+    }
+    private void disableAudio() {
+        // disable sound when recording.
+        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_ALARM,true);
+        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_DTMF,true);
+        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_MUSIC,true);
+        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_RING,true);
+        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_SYSTEM,true);
+        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_VOICE_CALL,true);
+
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
-        releaseMediaRecorder();
-        motionDetector.releaseCamera();
         camera.release();
+        recorder.release();
+        motionDetector.releaseCamera();
     }
 }
