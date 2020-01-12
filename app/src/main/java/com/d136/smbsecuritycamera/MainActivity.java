@@ -34,6 +34,7 @@ import com.hierynomus.smbj.share.DiskShare;
 import com.hierynomus.smbj.share.File;
 
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -83,6 +84,7 @@ public class MainActivity extends AppCompatActivity {
         textStatus = findViewById(R.id.textStatus);
         preview = findViewById(R.id.camera_preview);
 
+        recorder = new MediaRecorder();
         initRoutine();
 
 
@@ -135,7 +137,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
-    private void copyToSMB() throws IOException {
+    private void copyToSMB() {
         DiskShare diskShare = (DiskShare) smbConnection.getSession().connectShare(shareName);
         Set<FileAttributes> fileAttributes = new HashSet<>();
         fileAttributes.add(FileAttributes.FILE_ATTRIBUTE_NORMAL);
@@ -159,6 +161,10 @@ public class MainActivity extends AppCompatActivity {
                     out.write(buf, 0, len);
                 }
             }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
         if(!tmpVideo.delete()) Log.w(TAG,"Something went wrong.");
     }
@@ -192,6 +198,9 @@ public class MainActivity extends AppCompatActivity {
 
 
 
+
+
+
     // Camera and recording
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     private void record() {
@@ -209,8 +218,6 @@ public class MainActivity extends AppCompatActivity {
             }, time*1000);
         }
     }
-
-
 
     /** Check if this device has a camera */
     private boolean checkCameraHardware(Context context) {
@@ -231,8 +238,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void prepareVideoRecorder(){
         // Step 1: Unlock and set camera to MediaRecorder
-        recorder = new MediaRecorder();
-        motionDetector.releaseCamera();
+//        motionDetector.releaseCamera();
 
         camera.unlock();
         recorder.setCamera(camera);
@@ -269,30 +275,28 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void resetCamera() throws IOException {
-        camera.reconnect();
+    private void resetCamera() {
+        try {
+            camera.reconnect();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     public void stopRecorder() {
+        //end recording and move to smb
         recorder.stop();
-        resetMediaRecorder();//clear preparing
+        copyToSMB();
 
-        try {
-            resetCamera();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        try {
-            copyToSMB();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        initRoutine(); // resetted motiondetector
+        resetPreview();
+        resetMediaRecorder();
+//        resetCamera();
+
         btnRecord.setText("SERVICE RUNNING");
-        motionDetector.onResume();
         recording = false;
     }
+
 
 
 
@@ -303,6 +307,11 @@ public class MainActivity extends AppCompatActivity {
             camera = getCameraInstance();
         motionDetector = null;
         motionDetector = new MotionDetector(this, preview, camera);
+    }
+
+    private void resetPreview() {
+        preview.invalidate();
+        preview.setWillNotDraw(false);
     }
 
     void motionDetectorCallback(){

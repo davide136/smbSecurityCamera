@@ -8,6 +8,7 @@ import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -96,7 +97,7 @@ public class MotionDetector {
         this.motionDetectorCallback = motionDetectorCallback;
     }
 
-    public void consume(byte[] data, int width, int height) {
+    private void consume(byte[] data, int width, int height) {
         nextData.set(data);
         nextWidth.set(width);
         nextHeight.set(height);
@@ -116,7 +117,6 @@ public class MotionDetector {
 
     public void onResume() {
         if (checkCameraHardware()) {
-            mCamera = getCameraInstance();
 
             worker = new MotionDetectorThread();
             worker.start();
@@ -128,14 +128,10 @@ public class MotionDetector {
         }
     }
 
-    public boolean checkCameraHardware() {
-        if (mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA)){
-            // this device has a camera
-            return true;
-        } else {
-            // no camera on this device
-            return false;
-        }
+    private boolean checkCameraHardware() {
+        // this device has a camera
+        // no camera on this device
+        return mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA);
     }
 
 
@@ -179,7 +175,6 @@ public class MotionDetector {
          */
         @Override
         public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-            mCamera = getCameraInstance();
             Camera.Parameters parameters = mCamera.getParameters();
             Camera.Size size = getBestPreviewSize(width, height, parameters);
             if (size != null) {
@@ -223,7 +218,7 @@ public class MotionDetector {
         releaseCamera();
         if (previewHolder != null) previewHolder.removeCallback(surfaceCallback);
         if (worker != null) worker.stopDetection();
-        releaseCamera();
+//        releaseCamera();
     }
 
     public void releaseCamera(){
@@ -231,7 +226,12 @@ public class MotionDetector {
             mCamera.setPreviewCallback(null);
             if (inPreview) mCamera.stopPreview();
             inPreview = false;
-            mCamera.lock();        // release the camera for other applications
+            try {
+                mCamera.reconnect();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+//            mCamera.lock();        // release the camera for other applications
             mCamera = null;
         }
     }
