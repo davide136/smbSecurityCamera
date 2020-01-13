@@ -57,12 +57,13 @@ public class MainActivity extends AppCompatActivity {
 
     //Video recording
     private MediaRecorder recorder;
-    private boolean recording = false, serviceRunning = false;
+    private boolean recording = false, serviceRunning = false, firstRun=true, enoughTimeHasPassed = true;
     private java.io.File tmpVideo;
     private Camera camera;
     private SurfaceView preview;
     private MotionDetector motionDetector;
     private int time = 5;
+    private long lastRecordingTime;
 
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
@@ -83,7 +84,10 @@ public class MainActivity extends AppCompatActivity {
         preview = findViewById(R.id.camera_preview);
 
         recorder = new MediaRecorder();
-        initRoutine();
+        if(camera==null)
+            camera = getCameraInstance();
+        if(motionDetector == null)
+            motionDetector = new MotionDetector(this, preview, camera);
 
 
         //Actions
@@ -111,11 +115,17 @@ public class MainActivity extends AppCompatActivity {
                         serviceRunning = true;
                         recording = false;
                         motionDetectorCallback();
+                        textRecordingStatus.setText("SERVICE RUNNING");
+                        textRecordingStatus.setTextColor(Color.BLUE);
+                        motionDetector.onResume();
                     }
                     else{
                         btnRecord.setText("START SERVICE");
-                        serviceRunning = true;
-                        recording = true;
+                        serviceRunning = false;
+                        textRecordingStatus.setText("SERVICE STOPPED");
+                        textRecordingStatus.setTextColor(Color.RED);
+                        recording = false;
+                        motionDetector.onPause();
                     }
                 }
                 else
@@ -213,6 +223,7 @@ public class MainActivity extends AppCompatActivity {
     private void record() {
         if (!recording) {
             recording = true;
+
             prepareVideoRecorder();
             recorder.start();
 
@@ -284,12 +295,13 @@ public class MainActivity extends AppCompatActivity {
     public void stopRecorder() {
         //end recording and move to smb
         recorder.stop();
+        Log.w(TAG,"STOPPED RECORDING");
         copyToSMB();
+        Log.w(TAG,"MOVED TO SMB");
         releaseMediaRecorder();
-
+        lastRecordingTime = System.currentTimeMillis();
         textRecordingStatus.setText("SERVICE RUNNING");
         textRecordingStatus.setTextColor(Color.BLUE);
-
         recording = false;
     }
 
@@ -297,11 +309,23 @@ public class MainActivity extends AppCompatActivity {
 
 
     //Activity managing
+    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     void initRoutine() {
-        if(camera==null)
-            camera = getCameraInstance();
-        if(motionDetector == null)
-            motionDetector = new MotionDetector(this, preview, camera);
+        if (!firstRun) {
+            enoughTimeHasPassed = false;
+            long now = System.currentTimeMillis();
+            if ( (now -lastRecordingTime) > 500 )
+                enoughTimeHasPassed = true;
+        }
+
+
+        if (smbConnection.isConnected() & !recording & serviceRunning & enoughTimeHasPassed){
+            textRecordingStatus.setText("RECORDING");
+            textRecordingStatus.setTextColor(Color.GREEN);
+            firstRun = false;
+            Log.w(TAG,"RECORD STARTED");
+            record();
+        }
     }
 
     void motionDetectorCallback(){
@@ -309,11 +333,7 @@ public class MainActivity extends AppCompatActivity {
             @RequiresApi(api = Build.VERSION_CODES.KITKAT)
             @Override    public void onMotionDetected() {
                 try {
-                    if (smbConnection.isConnected() & recording ){
-                        textRecordingStatus.setText("RECORDING");
-                        textRecordingStatus.setTextColor(Color.GREEN);
-                        record();
-                    }
+                    initRoutine();
                 }catch(NullPointerException ignored){}
                 Log.w(TAG,"Motion detected");
             }
