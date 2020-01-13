@@ -14,10 +14,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MotionDetector {
+
     class MotionDetectorThread extends Thread {
         private AtomicBoolean isRunning = new AtomicBoolean(true);
 
-        public void stopDetection() {
+        void stopDetection() {
             isRunning.set(false);
         }
 
@@ -215,10 +216,9 @@ public class MotionDetector {
     }
 
     public void onPause() {
-        releaseCamera();
         if (previewHolder != null) previewHolder.removeCallback(surfaceCallback);
         if (worker != null) worker.stopDetection();
-//        releaseCamera();
+        releaseCamera();
     }
 
     public void releaseCamera(){

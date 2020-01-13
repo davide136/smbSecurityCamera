@@ -1,7 +1,6 @@
 package com.d136.smbsecuritycamera;
 
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -13,7 +12,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
-import android.view.Surface;
 import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Button;
@@ -53,19 +51,18 @@ public class MainActivity extends AppCompatActivity {
     //App routine
     private EditText editIPv4, editPort, editUser, editPassword;
     private Button btnConnect, btnRecord;
-    private TextView textStatus;
+    private TextView textConnectionStatus, textRecordingStatus;
     private String ip, port, user, password, shareName = "VideoRecorded";
     private smbConnection smbConnection;
 
     //Video recording
     private MediaRecorder recorder;
-    private boolean recording = false;
+    private boolean recording = false, serviceRunning = false;
     private java.io.File tmpVideo;
     private Camera camera;
     private SurfaceView preview;
     private MotionDetector motionDetector;
     private int time = 5;
-    private boolean serviceStarted = false;
 
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
@@ -81,7 +78,8 @@ public class MainActivity extends AppCompatActivity {
         editPassword = findViewById(R.id.editPassword);
         btnConnect = findViewById(R.id.btnConnect);
         btnRecord = findViewById(R.id.btnRecord);
-        textStatus = findViewById(R.id.textStatus);
+        textConnectionStatus = findViewById(R.id.textConnectionStatus);
+        textRecordingStatus = findViewById(R.id.textRecordingStatus);
         preview = findViewById(R.id.camera_preview);
 
         recorder = new MediaRecorder();
@@ -99,8 +97,8 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
                 smbConnection = null;
-                textStatus.setText("Disconnected");
-                textStatus.setTextColor(Color.RED);
+                textConnectionStatus.setText("Disconnected");
+                textConnectionStatus.setTextColor(Color.RED);
                 btnConnect.setText("Connect");
             }
         });
@@ -108,8 +106,17 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 if(checkCameraHardware(MainActivity.this)) {
-                    btnRecord.setText("SERVICE RUNNING");
-                    motionDetectorCallback();
+                    if(!serviceRunning){
+                        btnRecord.setText("STOP SERVICE");
+                        serviceRunning = true;
+                        recording = false;
+                        motionDetectorCallback();
+                    }
+                    else{
+                        btnRecord.setText("START SERVICE");
+                        serviceRunning = true;
+                        recording = true;
+                    }
                 }
                 else
                     Log.e(TAG,"Device is not supported!");
@@ -238,8 +245,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void prepareVideoRecorder(){
         // Step 1: Unlock and set camera to MediaRecorder
-//        motionDetector.releaseCamera();
-
         camera.unlock();
         recorder.setCamera(camera);
 
@@ -261,25 +266,17 @@ public class MainActivity extends AppCompatActivity {
             recorder.prepare();
         } catch (IllegalStateException e) {
             Log.d(TAG, "IllegalStateException preparing MediaRecorder: " + e.getMessage());
-            resetMediaRecorder();
+            releaseMediaRecorder();
         } catch (IOException e) {
             Log.d(TAG, "IOException preparing MediaRecorder: " + e.getMessage());
-            resetMediaRecorder();
+            releaseMediaRecorder();
         }
 
     }
 
-    private void resetMediaRecorder(){
+    private void releaseMediaRecorder(){
         if (recorder != null) {
             recorder.reset();   // clear recorder configuration
-        }
-    }
-
-    private void resetCamera() {
-        try {
-            camera.reconnect();
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
@@ -288,12 +285,11 @@ public class MainActivity extends AppCompatActivity {
         //end recording and move to smb
         recorder.stop();
         copyToSMB();
+        releaseMediaRecorder();
 
-        resetPreview();
-        resetMediaRecorder();
-//        resetCamera();
+        textRecordingStatus.setText("SERVICE RUNNING");
+        textRecordingStatus.setTextColor(Color.BLUE);
 
-        btnRecord.setText("SERVICE RUNNING");
         recording = false;
     }
 
@@ -302,16 +298,10 @@ public class MainActivity extends AppCompatActivity {
 
     //Activity managing
     void initRoutine() {
-        serviceStarted = true;
         if(camera==null)
             camera = getCameraInstance();
-        motionDetector = null;
-        motionDetector = new MotionDetector(this, preview, camera);
-    }
-
-    private void resetPreview() {
-        preview.invalidate();
-        preview.setWillNotDraw(false);
+        if(motionDetector == null)
+            motionDetector = new MotionDetector(this, preview, camera);
     }
 
     void motionDetectorCallback(){
@@ -319,8 +309,9 @@ public class MainActivity extends AppCompatActivity {
             @RequiresApi(api = Build.VERSION_CODES.KITKAT)
             @Override    public void onMotionDetected() {
                 try {
-                    if (smbConnection.isConnected() & !recording ){
-                        btnRecord.setText("RECORDING");
+                    if (smbConnection.isConnected() & recording ){
+                        textRecordingStatus.setText("RECORDING");
+                        textRecordingStatus.setTextColor(Color.GREEN);
                         record();
                     }
                 }catch(NullPointerException ignored){}
@@ -345,8 +336,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         disableAudio();
-        if(serviceStarted)
-            motionDetector.onResume();
+        motionDetector.onResume();
+
     }
 
     private void enableAudio(){
@@ -358,6 +349,7 @@ public class MainActivity extends AppCompatActivity {
         ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_SYSTEM,false);
         ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_VOICE_CALL,false);
     }
+
     private void disableAudio() {
         // disable sound when recording.
         ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_ALARM,true);

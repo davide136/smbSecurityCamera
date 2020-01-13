@@ -62,7 +62,7 @@ public class smbConnection extends AsyncTask<String, Void, Void> {
     }
 
     public void updateUI() {
-        status = mActivity.findViewById(R.id.textStatus);
+        status = mActivity.findViewById(R.id.textConnectionStatus);
         if(!isSuccessful) {
             status.setText("Disconnected");
             status.setTextColor(Color.RED);
