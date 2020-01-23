@@ -72,7 +72,7 @@ public class smbConnection extends AsyncTask<String, Void, Void> {
         status.setTextColor(Color.GREEN);
     }
 
-    boolean isConnected(){ return isSuccessful; }
+    public boolean isConnected(){ return isSuccessful; }
 
     Session getSession(){return mSession;}
 }

@@ -37,6 +37,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.DatagramSocket;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
 import java.util.Date;
@@ -48,17 +49,21 @@ import java.util.Set;
 public class MainActivity extends AppCompatActivity {
 
     final static String TAG = "MAIN";
+    private static com.d136.smbsecuritycamera.smbConnection smbConnection;
+
+    public static smbConnection getSmbConnection(){
+        return smbConnection;
+    }
 
     //App routine
     private EditText editIPv4, editPort, editUser, editPassword;
     private Button btnConnect, btnRecord;
-    private TextView textConnectionStatus, textRecordingStatus;
+    private static TextView textConnectionStatus, textRecordingStatus;
     private String ip = "192.168.1.102", port, user, password, shareName = "Download";
-    private smbConnection smbConnection;
 
     //Video recording
     private MediaRecorder recorder;
-    private boolean recording = false, serviceRunning = false, firstRun=true, enoughTimeHasPassed = true;
+    private static boolean recording = false, serviceRunning = false, firstRun=true, enoughTimeHasPassed = true;
     private java.io.File tmpVideo;
     private Camera camera;
     private SurfaceView preview;
@@ -66,6 +71,26 @@ public class MainActivity extends AppCompatActivity {
     private int time = 5;
     private long lastRecordingTime;
     private int counter=0;
+
+    public static TextView getTextStatus() {
+        return textRecordingStatus;
+    }
+
+    public static boolean getRecording() {
+        return recording;
+    }
+
+    public static boolean getServiceRunning() {
+        return serviceRunning;
+    }
+
+    public static boolean getFirstRun() {
+        return firstRun;
+    }
+
+    public static boolean getenoughTimeHasPassed() {
+        return enoughTimeHasPassed;
+    }
 
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
@@ -86,11 +111,11 @@ public class MainActivity extends AppCompatActivity {
         textRecordingStatus = findViewById(R.id.textRecordingStatus);
         preview = findViewById(R.id.camera_preview);
 
-        recorder = new MediaRecorder();
+/*        recorder = new MediaRecorder();
         if(camera==null)
-            camera = getCameraInstance();
+            camera = getCameraInstance();*/
         if(motionDetector == null)
-            motionDetector = new MotionDetector(this, preview, camera);
+            motionDetector = new MotionDetector(this, preview);
 
 
         //Actions
@@ -335,7 +360,7 @@ public class MainActivity extends AppCompatActivity {
             @RequiresApi(api = Build.VERSION_CODES.KITKAT)
             @Override    public void onMotionDetected() {
                 try {
-                    initRoutine();
+                    motionDetector.initRoutine();
                 }catch(NullPointerException ignored){}
                 Log.w(TAG,"Motion detected");
             }
@@ -394,6 +419,5 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         camera.release();
         recorder.release();
-        motionDetector.releaseCamera();
     }
 }

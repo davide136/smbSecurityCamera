@@ -2,23 +2,30 @@ package com.d136.smbsecuritycamera.motiondetection;
 
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.hardware.Camera;
+import android.media.MediaRecorder;
 import android.os.Handler;
 import android.util.Log;
+import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.widget.TextView;
 
-import java.io.IOException;
+import com.d136.smbsecuritycamera.MainActivity;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MotionDetector {
+    private MediaRecorder recorder;
+    final static String TAG = "MotionDetector";
 
     class MotionDetectorThread extends Thread {
         private AtomicBoolean isRunning = new AtomicBoolean(true);
 
-        void stopDetection() {
+        public void stopDetection() {
             isRunning.set(false);
         }
 
@@ -37,8 +44,7 @@ public class MotionDetector {
                         for (int i : img) {
                             lumaSum += i;
                         }
-                        if (motionDetectorCallback!= null)
-                            motionDetectorCallback.logCallback();
+                        if(motionDetectorCallback!=null) motionDetectorCallback.logCallback();
                         if (lumaSum < minLuma) {
                             if (motionDetectorCallback != null) {
                                 mHandler.post(new Runnable() {
@@ -70,7 +76,6 @@ public class MotionDetector {
         }
     }
 
-    private static final String TAG="MotionDetectorClass";
     private final AggregateLumaMotionDetection detector;
     private long checkInterval = 500;
     private long lastCheck = 0;
@@ -89,18 +94,17 @@ public class MotionDetector {
     private Context mContext;
     private SurfaceView mSurface;
 
-    public MotionDetector(Context context, SurfaceView previewSurface, Camera camera) {
+    public MotionDetector(Context context, SurfaceView previewSurface) {
         detector = new AggregateLumaMotionDetection();
         mContext = context;
         mSurface = previewSurface;
-        mCamera = camera;
     }
 
     public void setMotionDetectorCallback(MotionDetectorCallback motionDetectorCallback) {
         this.motionDetectorCallback = motionDetectorCallback;
     }
 
-    private void consume(byte[] data, int width, int height) {
+    public void consume(byte[] data, int width, int height) {
         nextData.set(data);
         nextWidth.set(width);
         nextHeight.set(height);
@@ -120,6 +124,7 @@ public class MotionDetector {
 
     public void onResume() {
         if (checkCameraHardware()) {
+            mCamera = getCameraInstance();
 
             worker = new MotionDetectorThread();
             worker.start();
@@ -131,15 +136,32 @@ public class MotionDetector {
         }
     }
 
-    private boolean checkCameraHardware() {
-        // this device has a camera
-        // no camera on this device
-        return mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA);
+    public boolean checkCameraHardware() {
+        if (mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA)){
+            // this device has a camera
+            return true;
+        } else {
+            // no camera on this device
+            return false;
+        }
     }
 
-
     private Camera getCameraInstance(){
-        return mCamera;
+        Camera c = null;
+
+        try {
+            if (Camera.getNumberOfCameras() >= 2) {
+                //if you want to open front facing camera use this line
+                c = Camera.open(Camera.CameraInfo.CAMERA_FACING_FRONT);
+            } else {
+                c = Camera.open();
+            }
+        }
+        catch (Exception e){
+            // Camera is not available (in use or does not exist)
+            //txtStatus.setText("Kamera nicht zur Benutzung freigegeben");
+        }
+        return c; // returns null if camera is unavailable
     }
 
     private Camera.PreviewCallback previewCallback = new Camera.PreviewCallback() {
@@ -218,23 +240,43 @@ public class MotionDetector {
     }
 
     public void onPause() {
+        releaseCamera();
         if (previewHolder != null) previewHolder.removeCallback(surfaceCallback);
         if (worker != null) worker.stopDetection();
-        releaseCamera();
     }
 
-    public void releaseCamera(){
+    private void releaseCamera(){
         if (mCamera != null){
             mCamera.setPreviewCallback(null);
             if (inPreview) mCamera.stopPreview();
             inPreview = false;
-            try {
-                mCamera.reconnect();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-//            mCamera.lock();        // release the camera for other applications
+            mCamera.release();        // release the camera for other applications
             mCamera = null;
         }
     }
+
+
+
+    boolean recording, serviceRunning, firstRun, enoughTimeHasPassed;
+
+    public void initRoutine(){
+        worker.stopDetection();
+        recorder = new MediaRecorder();
+        if(mCamera==null)
+            mCamera = getCameraInstance();
+        TextView textRecordingStatus = MainActivity.getTextStatus();
+        recording = MainActivity.getRecording();
+        serviceRunning = MainActivity.getServiceRunning();
+        firstRun= MainActivity.getFirstRun();
+        enoughTimeHasPassed = MainActivity.getenoughTimeHasPassed();
+
+
+        if (MainActivity.getSmbConnection().isConnected() & !recording & serviceRunning & enoughTimeHasPassed){
+            textRecordingStatus.setText("RECORDING");
+            textRecordingStatus.setTextColor(Color.GREEN);
+            firstRun = false;
+            Log.w(TAG,"RECORD STARTED");
+            record();
+    }
+
 }
