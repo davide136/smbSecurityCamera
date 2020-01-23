@@ -14,6 +14,7 @@ import android.os.Handler;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -52,7 +53,7 @@ public class MainActivity extends AppCompatActivity {
     private EditText editIPv4, editPort, editUser, editPassword;
     private Button btnConnect, btnRecord;
     private TextView textConnectionStatus, textRecordingStatus;
-    private String ip, port, user, password, shareName = "VideoRecorded";
+    private String ip = "192.168.1.102", port, user, password, shareName = "Download";
     private smbConnection smbConnection;
 
     //Video recording
@@ -64,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
     private MotionDetector motionDetector;
     private int time = 5;
     private long lastRecordingTime;
+    private int counter=0;
 
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
@@ -71,6 +73,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
 
         //init layout
         editIPv4 = findViewById(R.id.editIPv4);
@@ -142,7 +145,6 @@ public class MainActivity extends AppCompatActivity {
     @RequiresApi(api = Build.VERSION_CODES.KITKAT) //SISTEMARE IP PRIMA DELLA RELEASE
     private void connect() {
 //        ip = editIPv4.getText().toString();
-        ip = "192.168.1.9";
         port = editPort.getText().toString();
         user = editUser.getText().toString();
         password = editPassword.getText().toString();
@@ -277,15 +279,15 @@ public class MainActivity extends AppCompatActivity {
             recorder.prepare();
         } catch (IllegalStateException e) {
             Log.d(TAG, "IllegalStateException preparing MediaRecorder: " + e.getMessage());
-            releaseMediaRecorder();
+            resetMediaRecorder();
         } catch (IOException e) {
             Log.d(TAG, "IOException preparing MediaRecorder: " + e.getMessage());
-            releaseMediaRecorder();
+            resetMediaRecorder();
         }
 
     }
 
-    private void releaseMediaRecorder(){
+    private void resetMediaRecorder(){
         if (recorder != null) {
             recorder.reset();   // clear recorder configuration
         }
@@ -298,7 +300,7 @@ public class MainActivity extends AppCompatActivity {
         Log.w(TAG,"STOPPED RECORDING");
         copyToSMB();
         Log.w(TAG,"MOVED TO SMB");
-        releaseMediaRecorder();
+        resetMediaRecorder();
         lastRecordingTime = System.currentTimeMillis();
         textRecordingStatus.setText("SERVICE RUNNING");
         textRecordingStatus.setTextColor(Color.BLUE);
@@ -341,6 +343,12 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onTooDark() {
                 Log.w(TAG,"Too dark here");
+            }
+
+            @Override
+            public void logCallback() {
+                Log.w(TAG, "call number "+counter);
+                counter ++;
             }
         });
     }

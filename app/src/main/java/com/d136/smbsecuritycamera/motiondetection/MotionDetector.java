@@ -37,6 +37,8 @@ public class MotionDetector {
                         for (int i : img) {
                             lumaSum += i;
                         }
+                        if (motionDetectorCallback!= null)
+                            motionDetectorCallback.logCallback();
                         if (lumaSum < minLuma) {
                             if (motionDetectorCallback != null) {
                                 mHandler.post(new Runnable() {
