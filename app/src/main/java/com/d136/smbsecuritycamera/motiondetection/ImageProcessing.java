@@ -1,5 +1,4 @@
 package com.d136.smbsecuritycamera.motiondetection;
-
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;

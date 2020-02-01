@@ -1,5 +1,4 @@
 package com.d136.smbsecuritycamera.motiondetection;
-
 public interface IMotionDetection {
 
     /**

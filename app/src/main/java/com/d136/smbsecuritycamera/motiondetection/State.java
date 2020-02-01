@@ -1,5 +1,4 @@
 package com.d136.smbsecuritycamera.motiondetection;
-
 public class State {
 
     private int[] map = null;

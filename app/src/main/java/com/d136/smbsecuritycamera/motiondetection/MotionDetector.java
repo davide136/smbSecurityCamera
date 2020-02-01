@@ -1,27 +1,18 @@
 package com.d136.smbsecuritycamera.motiondetection;
-
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
 import android.hardware.Camera;
-import android.media.MediaRecorder;
 import android.os.Handler;
 import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.widget.TextView;
-
-import com.d136.smbsecuritycamera.MainActivity;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MotionDetector {
-    private MediaRecorder recorder;
-    final static String TAG = "MotionDetector";
-
     class MotionDetectorThread extends Thread {
         private AtomicBoolean isRunning = new AtomicBoolean(true);
 
@@ -44,7 +35,6 @@ public class MotionDetector {
                         for (int i : img) {
                             lumaSum += i;
                         }
-                        if(motionDetectorCallback!=null) motionDetectorCallback.logCallback();
                         if (lumaSum < minLuma) {
                             if (motionDetectorCallback != null) {
                                 mHandler.post(new Runnable() {
@@ -254,29 +244,4 @@ public class MotionDetector {
             mCamera = null;
         }
     }
-
-
-
-    boolean recording, serviceRunning, firstRun, enoughTimeHasPassed;
-
-    public void initRoutine(){
-        worker.stopDetection();
-        recorder = new MediaRecorder();
-        if(mCamera==null)
-            mCamera = getCameraInstance();
-        TextView textRecordingStatus = MainActivity.getTextStatus();
-        recording = MainActivity.getRecording();
-        serviceRunning = MainActivity.getServiceRunning();
-        firstRun= MainActivity.getFirstRun();
-        enoughTimeHasPassed = MainActivity.getenoughTimeHasPassed();
-
-
-        if (MainActivity.getSmbConnection().isConnected() & !recording & serviceRunning & enoughTimeHasPassed){
-            textRecordingStatus.setText("RECORDING");
-            textRecordingStatus.setTextColor(Color.GREEN);
-            firstRun = false;
-            Log.w(TAG,"RECORD STARTED");
-            record();
-    }
-
 }
