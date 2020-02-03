@@ -2,12 +2,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <SwitchPreferenceCompat
-        app:key="notifications"
-        app:title="Enable message notifications"/>
+        app:key="portEnabled"
+        app:title="Custom port number"/>
 
-    <Preference
-        app:key="feedback"
-        app:title="Send feedback"
-        app:summary="Report technical issues or suggest new features"/>
+    <EditTextPreference
+        app:key="port"
+        app:title="Port number"
+        app:defaultValue="445"
+        app:summary="445"/>
 
 </PreferenceScreen>

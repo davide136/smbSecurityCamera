@@ -3,6 +3,7 @@ package com.d136.smbsecuritycamera;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.hardware.Camera;
 import android.media.AudioManager;
 import android.os.Build;
@@ -20,6 +21,7 @@ import android.widget.TextView;
 
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.PreferenceManager;
 
 import com.d136.smbsecuritycamera.motiondetection.MotionDetector;
 import com.d136.smbsecuritycamera.motiondetection.MotionDetectorCallback;
@@ -55,8 +57,8 @@ public class MainActivity extends AppCompatActivity {
     private String ip = "192.168.1.102", port, user, password, shareName = "Download";
     private java.io.File tmpVideo;
     private smbConnection smbConnection;
-    private Camera camera;
     private MotionDetector motionDetector;
+    private SharedPreferences sharedPreferences;
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
@@ -70,7 +72,8 @@ public class MainActivity extends AppCompatActivity {
         textConnectionStatus = findViewById(R.id.textConnectionStatus);
         textRecordingStatus = findViewById(R.id.textRecordingStatus);
 
-
+        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getBaseContext());
+        port = (sharedPreferences.getString("port","465"));
 
         motionDetector = new MotionDetector(this, (SurfaceView) findViewById(R.id.surfaceView));
         motionDetector.setMotionDetectorCallback(new MotionDetectorCallback() {
@@ -84,7 +87,6 @@ public class MainActivity extends AppCompatActivity {
                 textConnectionStatus.setText("Too dark here");
             }
         });
-
         btnRecord.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -93,7 +95,16 @@ public class MainActivity extends AppCompatActivity {
         });
 ////// Config Options//motionDetector.setCheckInterval(500);//motionDetector.setLeniency(20);//motionDetector.setMinLuma(1000);
 
+        btnConnect.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                connect();
+            }
+        });
+
     }
+
+
 
     @Override
     protected void onResume() {
