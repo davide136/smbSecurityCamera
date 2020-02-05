@@ -11,4 +11,14 @@
         app:defaultValue="445"
         app:summary="445"/>
 
+    <EditTextPreference
+        app:key="user"
+        app:title="Username"
+        app:summary=""/>
+
+    <EditTextPreference
+        app:key="password"
+        app:title="Password"
+        app:summary=""/>
+
 </PreferenceScreen>

@@ -8,7 +8,7 @@ import androidx.preference.PreferenceFragmentCompat;
 
 public class MySettingsFragment extends PreferenceFragmentCompat {
     private static String TAG = "PreferenceFragment";
-    Preference portPref, customPortPref;
+    Preference portPref, customPortPref, userPref, passwordPref;
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -18,6 +18,8 @@ public class MySettingsFragment extends PreferenceFragmentCompat {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+
         portPref = findPreference("port");
         assert portPref != null;
         portPref.setSummary(portPref.getSharedPreferences().getString("port","445"));
@@ -45,5 +47,28 @@ public class MySettingsFragment extends PreferenceFragmentCompat {
                 else portPref.setEnabled(true);
                     return true;
         }});
+
+        userPref = findPreference("user");
+        assert userPref != null;
+        userPref.setSummary(userPref.getSharedPreferences().getString("user",null));
+        userPref.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                preference.setSummary(newValue+"");
+                return true;
+            }
+        });
+
+        passwordPref = findPreference("password");
+        assert passwordPref != null;
+        passwordPref.setSummary(passwordPref.getSharedPreferences().getString("password",null));
+        passwordPref.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                preference.setSummary(newValue+"");
+                return true;
+            }
+        });
+
     }
 }

@@ -10,13 +10,9 @@ import android.hardware.Camera;
 import android.media.AudioManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.os.Vibrator;
 import android.preference.PreferenceManager;
 import android.text.InputType;
 import android.util.Log;
-import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -61,14 +57,14 @@ public class MainActivity extends AppCompatActivity {
     private EditText editIPv4;
     private Button btnConnect, btnRecord;
     private TextView textConnectionStatus, textRecordingStatus;
-    private String ip, port, user="", password="", shareName = "VideoRecorded";
+    private String ip, port, user="", password="", shareName = "";
     private java.io.File tmpVideo;
     private smbConnection smbConnection;
     private MotionDetector motionDetector;
     private SharedPreferences sharedPreferences;
     private Boolean detectorStarted=false;
     private SMBConnectionCallback smbConnectionCallback;
-    private MotionDetectorCallback motionDetectorCallback;
+    private SurfaceView preview;
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
@@ -81,50 +77,50 @@ public class MainActivity extends AppCompatActivity {
         btnRecord = findViewById(R.id.btnRecord);
         textConnectionStatus = findViewById(R.id.textConnectionStatus);
         textRecordingStatus = findViewById(R.id.textRecordingStatus);
-
+        preview = findViewById(R.id.surfaceView);
 
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-        port = (sharedPreferences.getString("port","445"));
+        port = sharedPreferences.getString("port","445");
         ip = sharedPreferences.getString("ip","");
         if(ip != "")
             editIPv4.setText(ip);
         initConnection();
 
-
-        motionDetectorCallback = new MotionDetectorCallback() {
-            @Override    public void onMotionDetected() {
-                Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-                v.vibrate(80);
-                textConnectionStatus.setText("Motion detected");
+        motionDetector = new MotionDetector(this, preview);
+        motionDetector.setMotionDetectorCallback(new MotionDetectorCallback() {
+            @Override
+            public void onMotionDetected() {
+                Log.w(TAG,"MOTION DETECTED");
             }
 
-            @Override    public void onTooDark() {
-                textConnectionStatus.setText("Too dark here");
+            @Override
+            public void onTooDark() {
+                Log.w(TAG,"TOO DARK");
             }
-        };
-        motionDetector = new MotionDetector(MainActivity.this, (SurfaceView) findViewById(R.id.surfaceView));
-        motionDetector.setMotionDetectorCallback(motionDetectorCallback);
-        motionDetector.onResume();
-        motionDetector.onPause();
-        ////// Config Options//motionDetector.setCheckInterval(500);//motionDetector.setLeniency(20);//motionDetector.setMinLuma(1000);
+        });
 
+        ////// Config Options
+        //motionDetector.setCheckInterval(500);
+        //motionDetector.setLeniency(20);
+        //motionDetector.setMinLuma(1000);
         btnRecord.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 if(!detectorStarted)
                 {
-                    motionDetector.onResume();
+                    motionDetector.resumeDetection();
                     btnRecord.setText("Service started");
                     detectorStarted = true;
                 }
                 else
                 {
-                    motionDetector.onPause();
+                    motionDetector.pauseDetection();
                     btnRecord.setText("Record");
                     detectorStarted = false;
                 }
             }
         });
+
 
         btnConnect.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -208,14 +204,14 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if(detectorStarted)
+//        if(detectorStarted)
             motionDetector.onResume();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        if(detectorStarted)
+//        if(detectorStarted)
             motionDetector.onPause();
     }
 
@@ -263,6 +259,9 @@ public class MainActivity extends AppCompatActivity {
     private void connect() {
         ip = editIPv4.getText().toString();
         sharedPreferences.edit().putString("ip",ip).apply();
+        user = sharedPreferences.getString("user",null);
+        password = sharedPreferences.getString("password",null);
+
         String[] params = {ip, port, user, password, shareName};
         smbConnection.execute(params);
         btnConnect.setText("Disconnect");

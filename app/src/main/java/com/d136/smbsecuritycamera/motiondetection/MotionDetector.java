@@ -1,4 +1,5 @@
 package com.d136.smbsecuritycamera.motiondetection;
+
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.hardware.Camera;
@@ -13,8 +14,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MotionDetector {
+    private boolean workerIsRunning = true;
+    private boolean firstRun = true;
+
     class MotionDetectorThread extends Thread {
         private AtomicBoolean isRunning = new AtomicBoolean(true);
+        private volatile boolean paused = false;
+        private volatile boolean running = true;
+        private final Object pauseLock = new Object();
+
+
 
         public void stopDetection() {
             isRunning.set(false);
@@ -22,14 +31,45 @@ public class MotionDetector {
 
         @Override
         public void run() {
-            while (isRunning.get()) {
+
+            while (running) {
+                synchronized (pauseLock) {
+                    if (!running) { // may have changed while waiting to
+                        // synchronize on pauseLock
+                        break;
+                    }
+                    if (paused) {
+                        try {
+                            synchronized (pauseLock) {
+                                pauseLock.wait(); // will cause this Thread to block until
+                                // another thread calls pauseLock.notifyAll()
+                                // Note that calling wait() will
+                                // relinquish the synchronized lock that this
+                                // thread holds on pauseLock so another thread
+                                // can acquire the lock to call notifyAll()
+                                // (link with explanation below this code)
+                            }
+                        } catch (InterruptedException ex) {
+                            break;
+                        }
+                        if (!running) { // running might have changed since we paused
+                            break;
+                        }
+                    }
+                }
+                motionDetectCode();
+            }
+
+
+        }
+
+        private void motionDetectCode() {
+
                 long now = System.currentTimeMillis();
                 if (now-lastCheck > checkInterval) {
                     lastCheck = now;
 
                     if (nextData.get() != null) {
-                        if(mSurface==null)
-                            return;
                         int[] img = ImageProcessing.decodeYUV420SPtoLuma(nextData.get(), nextWidth.get(), nextHeight.get());
 
                         // check if it is too dark
@@ -64,7 +104,26 @@ public class MotionDetector {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
+
+        }
+
+        public void pause() {
+            paused = true;
+        }
+
+        public void resumE() {
+            synchronized (pauseLock) {
+                paused = false;
+                pauseLock.notifyAll(); // Unblocks thread
             }
+        }
+
+        public void stoP() {
+            running = false;
+            // you might also want to interrupt() the Thread that is
+            // running this Runnable, too, or perhaps call:
+            resumE();
+            // to unblock
         }
     }
 
@@ -114,12 +173,15 @@ public class MotionDetector {
         detector.setLeniency(l);
     }
 
-
     public void onResume() {
         if (checkCameraHardware()) {
+            mCamera = getCameraInstance();
 
             worker = new MotionDetectorThread();
             worker.start();
+            if(firstRun)
+                worker.pause();
+
 
             // configure preview
             previewHolder = mSurface.getHolder();
@@ -128,26 +190,17 @@ public class MotionDetector {
         }
     }
 
-    public boolean checkCameraHardware() {
-        if (mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA)){
-            // this device has a camera
-            return true;
-        } else {
-            // no camera on this device
-            return false;
-        }
+    private boolean checkCameraHardware() {
+        // this device has a camera
+        // no camera on this device
+        return mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA);
     }
 
     private Camera getCameraInstance(){
         Camera c = null;
 
         try {
-            if (Camera.getNumberOfCameras() >= 2) {
-                //if you want to open front facing camera use this line
-                c = Camera.open(Camera.CameraInfo.CAMERA_FACING_FRONT);
-            } else {
-                c = Camera.open();
-            }
+            c = Camera.open();
         }
         catch (Exception e){
             // Camera is not available (in use or does not exist)
@@ -229,6 +282,21 @@ public class MotionDetector {
         }
 
         return result;
+    }
+
+    public void pauseDetection(){
+        if (workerIsRunning)
+        {
+            worker.pause();
+            workerIsRunning = false;
+        }
+    }
+
+    public void resumeDetection(){
+        if (firstRun || !workerIsRunning) {
+            worker.resumE();
+            workerIsRunning = true;
+        }
     }
 
     public void onPause() {
