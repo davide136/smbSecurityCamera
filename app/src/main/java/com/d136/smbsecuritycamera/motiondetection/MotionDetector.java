@@ -28,6 +28,8 @@ public class MotionDetector {
                     lastCheck = now;
 
                     if (nextData.get() != null) {
+                        if(mSurface==null)
+                            return;
                         int[] img = ImageProcessing.decodeYUV420SPtoLuma(nextData.get(), nextWidth.get(), nextHeight.get());
 
                         // check if it is too dark
@@ -88,8 +90,6 @@ public class MotionDetector {
         detector = new AggregateLumaMotionDetection();
         mContext = context;
         mSurface = previewSurface;
-        if(checkCameraHardware())
-            mCamera = getCameraInstance();
     }
 
     public void setMotionDetectorCallback(MotionDetectorCallback motionDetectorCallback) {

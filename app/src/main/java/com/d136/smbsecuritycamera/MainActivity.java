@@ -68,6 +68,7 @@ public class MainActivity extends AppCompatActivity {
     private SharedPreferences sharedPreferences;
     private Boolean detectorStarted=false;
     private SMBConnectionCallback smbConnectionCallback;
+    private MotionDetectorCallback motionDetectorCallback;
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
@@ -90,9 +91,7 @@ public class MainActivity extends AppCompatActivity {
         initConnection();
 
 
-
-        motionDetector = new MotionDetector(this, (SurfaceView) findViewById(R.id.surfaceView));
-        motionDetector.setMotionDetectorCallback(new MotionDetectorCallback() {
+        motionDetectorCallback = new MotionDetectorCallback() {
             @Override    public void onMotionDetected() {
                 Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
                 v.vibrate(80);
@@ -102,7 +101,11 @@ public class MainActivity extends AppCompatActivity {
             @Override    public void onTooDark() {
                 textConnectionStatus.setText("Too dark here");
             }
-        });
+        };
+        motionDetector = new MotionDetector(MainActivity.this, (SurfaceView) findViewById(R.id.surfaceView));
+        motionDetector.setMotionDetectorCallback(motionDetectorCallback);
+        motionDetector.onResume();
+        motionDetector.onPause();
         ////// Config Options//motionDetector.setCheckInterval(500);//motionDetector.setLeniency(20);//motionDetector.setMinLuma(1000);
 
         btnRecord.setOnClickListener(new View.OnClickListener() {
