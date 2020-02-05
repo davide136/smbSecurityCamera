@@ -2,6 +2,7 @@ package com.d136.smbsecuritycamera;
 
 
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -9,8 +10,11 @@ import android.hardware.Camera;
 import android.media.AudioManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Vibrator;
 import android.preference.PreferenceManager;
+import android.text.InputType;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -22,6 +26,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 
 import androidx.annotation.RequiresApi;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.d136.smbsecuritycamera.motiondetection.MotionDetector;
@@ -61,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
     private MotionDetector motionDetector;
     private SharedPreferences sharedPreferences;
     private Boolean detectorStarted=false;
+    private SMBConnectionCallback smbConnectionCallback;
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
@@ -74,11 +80,13 @@ public class MainActivity extends AppCompatActivity {
         textConnectionStatus = findViewById(R.id.textConnectionStatus);
         textRecordingStatus = findViewById(R.id.textRecordingStatus);
 
+
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         port = (sharedPreferences.getString("port","445"));
         ip = sharedPreferences.getString("ip","");
         if(ip != "")
             editIPv4.setText(ip);
+        smbConnection = new smbConnection(this);
 
 
 
@@ -111,21 +119,56 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+        smbConnectionCallback = new SMBConnectionCallback() {
+            @Override
+            public void onConnectionSuccessful() {
+                setShareName();
+            }
+        };
 ////// Config Options//motionDetector.setCheckInterval(500);//motionDetector.setLeniency(20);//motionDetector.setMinLuma(1000);
+        smbConnection.setSMBConnectionCallback(smbConnectionCallback);
         btnConnect.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(smbConnection==null||!smbConnection.isConnected())
+                if (smbConnection == null || !smbConnection.isConnected()) {
                     connect();
-                else{
+                } else {
                     smbConnection.stop();
+                    smbConnection.cancel(true);
                     btnConnect.setText("Connect");
                 }
             }
         });
-
     }
 
+    private void setShareName() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Insert the name of the share to connect to:");
+
+// Set up the input
+        final EditText input = new EditText(this);
+// Specify the type of input expected; this, for example, sets the input as a password, and will mask the text
+        input.setInputType(InputType.TYPE_CLASS_TEXT );
+        builder.setView(input);
+// Set up the buttons
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                input.setText(sharedPreferences.getString("shareName", null));
+                shareName = input.getText().toString();
+                sharedPreferences.edit().putString("shareName",shareName).apply();
+            }
+        });
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.cancel();
+                sharedPreferences.edit().putString("shareName","").apply();
+                shareName = "";
+            }
+        });
+        builder.show();
+    }
 
 
     @Override
@@ -141,7 +184,6 @@ public class MainActivity extends AppCompatActivity {
         if(detectorStarted)
             motionDetector.onPause();
     }
-
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -189,7 +231,6 @@ public class MainActivity extends AppCompatActivity {
         sharedPreferences.edit().putString("ip",ip).apply();
 
         String[] params = {ip, port, user, password, shareName};
-        smbConnection = new smbConnection(this);
         smbConnection.execute(params);
         btnConnect.setText("Disconnect");
     }

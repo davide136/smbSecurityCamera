@@ -26,6 +26,8 @@ public class smbConnection extends AsyncTask<String, Void, Void> {
     private Activity mActivity;
     private Connection mConnection;
     private AuthenticationContext mAc;
+    private SMBConnectionCallback smbConnectionCallback;
+
 
     smbConnection(Activity mainActivity) {
         mActivity = mainActivity;
@@ -51,6 +53,9 @@ public class smbConnection extends AsyncTask<String, Void, Void> {
             mConnection = client.connect(ip,port);
             mSession = mConnection.authenticate(mAc);
             isSuccessful = true;
+        if (smbConnectionCallback != null )
+            smbConnectionCallback.onConnectionSuccessful();
+
         } catch (IOException e) {e.printStackTrace();}
         return null;
     }
@@ -59,6 +64,10 @@ public class smbConnection extends AsyncTask<String, Void, Void> {
     protected void onPostExecute(Void session) {
         super.onPostExecute(session);
         updateUI();
+    }
+
+    public void setSMBConnectionCallback(SMBConnectionCallback smbConnectionCallback){
+        this.smbConnectionCallback = smbConnectionCallback;
     }
 
     public void updateUI() {
@@ -78,6 +87,11 @@ public class smbConnection extends AsyncTask<String, Void, Void> {
 
     public void stop() {
         isSuccessful=false;
+        try {
+            mSession.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         updateUI();
     }
 }
