@@ -4,11 +4,13 @@ package com.d136.smbsecuritycamera;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.hardware.Camera;
 import android.media.AudioManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Vibrator;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -21,7 +23,6 @@ import android.widget.TextView;
 
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.preference.PreferenceManager;
 
 import com.d136.smbsecuritycamera.motiondetection.MotionDetector;
 import com.d136.smbsecuritycamera.motiondetection.MotionDetectorCallback;
@@ -54,11 +55,12 @@ public class MainActivity extends AppCompatActivity {
     private EditText editIPv4;
     private Button btnConnect, btnRecord;
     private TextView textConnectionStatus, textRecordingStatus;
-    private String ip = "192.168.1.102", port, user, password, shareName = "Download";
+    private String ip, port, user="", password="", shareName = "VideoRecorded";
     private java.io.File tmpVideo;
     private smbConnection smbConnection;
     private MotionDetector motionDetector;
     private SharedPreferences sharedPreferences;
+    private Boolean detectorStarted=false;
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
@@ -72,8 +74,13 @@ public class MainActivity extends AppCompatActivity {
         textConnectionStatus = findViewById(R.id.textConnectionStatus);
         textRecordingStatus = findViewById(R.id.textRecordingStatus);
 
-        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getBaseContext());
-        port = (sharedPreferences.getString("port","465"));
+        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        port = (sharedPreferences.getString("port","445"));
+        ip = sharedPreferences.getString("ip","");
+        if(ip != "")
+            editIPv4.setText(ip);
+
+
 
         motionDetector = new MotionDetector(this, (SurfaceView) findViewById(R.id.surfaceView));
         motionDetector.setMotionDetectorCallback(new MotionDetectorCallback() {
@@ -90,15 +97,30 @@ public class MainActivity extends AppCompatActivity {
         btnRecord.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                motionDetector.onResume();
+                if(!detectorStarted)
+                {
+                    motionDetector.onResume();
+                    btnRecord.setText("Service started");
+                    detectorStarted = true;
+                }
+                else
+                {
+                    motionDetector.onPause();
+                    btnRecord.setText("Record");
+                    detectorStarted = false;
+                }
             }
         });
 ////// Config Options//motionDetector.setCheckInterval(500);//motionDetector.setLeniency(20);//motionDetector.setMinLuma(1000);
-
         btnConnect.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                connect();
+                if(smbConnection==null||!smbConnection.isConnected())
+                    connect();
+                else{
+                    smbConnection.stop();
+                    btnConnect.setText("Connect");
+                }
             }
         });
 
@@ -109,13 +131,15 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        motionDetector.onResume();
+        if(detectorStarted)
+            motionDetector.onResume();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        motionDetector.onPause();
+        if(detectorStarted)
+            motionDetector.onPause();
     }
 
 
@@ -161,10 +185,8 @@ public class MainActivity extends AppCompatActivity {
     // File management
     // SISTEMARE IP PRIMA DELLA RELEASE
     private void connect() {
-//        ip = editIPv4.getText().toString();
-//        port = editPort.getText().toString();
-//        user = editUser.getText().toString();
-//        password = editPassword.getText().toString();
+        ip = editIPv4.getText().toString();
+        sharedPreferences.edit().putString("ip",ip).apply();
 
         String[] params = {ip, port, user, password, shareName};
         smbConnection = new smbConnection(this);
@@ -229,6 +251,7 @@ public class MainActivity extends AppCompatActivity {
         tmpVideo = mediaFile;
         return mediaFile;
     }
+
 
 
     private void enableAudio(){

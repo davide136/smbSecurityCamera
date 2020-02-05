@@ -88,6 +88,8 @@ public class MotionDetector {
         detector = new AggregateLumaMotionDetection();
         mContext = context;
         mSurface = previewSurface;
+        if(checkCameraHardware())
+            mCamera = getCameraInstance();
     }
 
     public void setMotionDetectorCallback(MotionDetectorCallback motionDetectorCallback) {
@@ -112,9 +114,9 @@ public class MotionDetector {
         detector.setLeniency(l);
     }
 
+
     public void onResume() {
         if (checkCameraHardware()) {
-            mCamera = getCameraInstance();
 
             worker = new MotionDetectorThread();
             worker.start();

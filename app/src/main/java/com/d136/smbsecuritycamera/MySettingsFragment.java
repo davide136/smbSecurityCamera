@@ -1,17 +1,14 @@
 package com.d136.smbsecuritycamera;
 
-import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.util.Log;
 
-import androidx.preference.ListPreference;
+import androidx.annotation.Nullable;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 
-public class MySettingsFragment extends PreferenceFragmentCompat implements SharedPreferences.OnSharedPreferenceChangeListener {
+public class MySettingsFragment extends PreferenceFragmentCompat {
     private static String TAG = "PreferenceFragment";
-    int port;
-    boolean customPortEnabled;
+    Preference portPref, customPortPref;
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -19,12 +16,34 @@ public class MySettingsFragment extends PreferenceFragmentCompat implements Shar
     }
 
     @Override
-    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
-        Preference pref = findPreference(key);
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        portPref = findPreference("port");
+        assert portPref != null;
+        portPref.setSummary(portPref.getSharedPreferences().getString("port","445"));
+        portPref.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                try{
+                    int check = Integer.valueOf(newValue.toString());
+                }catch(Exception e){return false;}
+                preference.setSummary(newValue+"");
+                return true;
+            }
+        });
 
-        if (pref instanceof ListPreference) {
-            ListPreference listPref = (ListPreference) pref;
-            pref.setSummary(listPref.getEntry());
-        }
+        customPortPref = findPreference("portEnabled");
+        assert customPortPref != null;
+        customPortPref.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                if (newValue.equals(false)){
+                    portPref.getSharedPreferences().edit().putString("port","445").apply();
+                    portPref.callChangeListener("445");
+                    portPref.setEnabled(false);
+                }
+                else portPref.setEnabled(true);
+                    return true;
+        }});
     }
 }

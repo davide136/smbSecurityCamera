@@ -75,4 +75,9 @@ public class smbConnection extends AsyncTask<String, Void, Void> {
     public boolean isConnected(){ return isSuccessful; }
 
     Session getSession(){return mSession;}
+
+    public void stop() {
+        isSuccessful=false;
+        updateUI();
+    }
 }
