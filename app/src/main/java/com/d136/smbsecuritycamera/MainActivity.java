@@ -5,7 +5,6 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.hardware.Camera;
 import android.media.AudioManager;
@@ -99,7 +98,12 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onMotionDetected() {
                 Log.w(TAG,"MOTION DETECTED");
-                record();
+                if(smbConnection.isConnected()){
+                    textRecordingStatus.setText("SERVICE RUNNING");
+                    textRecordingStatus.setTextColor(Color.BLUE);
+                    record();
+                }
+
             }
 
             @Override
@@ -151,15 +155,17 @@ public class MainActivity extends AppCompatActivity {
     private void record() {
         if (!recording) {
             recording = true;
-
+            motionDetector.pauseDetection();
             prepareVideoRecorder();
             recorder.start();
-
+            textRecordingStatus.setText("RECORDING");
+            textRecordingStatus.setTextColor(Color.RED);
             Handler handler = new Handler();
             handler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
                     stopRecorder();
+                    motionDetector.resumeDetection();
                 }
             }, time*1000);
         }
@@ -173,9 +179,9 @@ public class MainActivity extends AppCompatActivity {
         copyToSMB();
         Log.w(TAG,"MOVED TO SMB");
         releaseMediaRecorder();
-        lastRecordingTime = System.currentTimeMillis();
         textRecordingStatus.setText("SERVICE RUNNING");
         textRecordingStatus.setTextColor(Color.BLUE);
+        motionDetector.fixSurfaces();
         recording = false;
     }
 
@@ -183,12 +189,6 @@ public class MainActivity extends AppCompatActivity {
         if (recorder != null) {
             recorder.reset();   // clear recorder configuration
         }
-    }
-
-
-    /** Check if this device has a camera */
-    private boolean checkCameraHardware(Context context) {
-        return context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA);
     }
 
     private void prepareVideoRecorder(){
@@ -209,7 +209,7 @@ public class MainActivity extends AppCompatActivity {
         recorder.setOutputFile(getOutputMediaFile()+"");
 
         // Step 5: Set the preview output
-        recorder.setPreviewDisplay(preview.getHolder().getSurface());
+        recorder.setPreviewDisplay(motionDetector.getSurface());
 
         // Step 6: Prepare configured MediaRecorder
         try {

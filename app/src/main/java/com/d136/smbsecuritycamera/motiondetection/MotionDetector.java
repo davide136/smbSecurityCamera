@@ -17,6 +17,16 @@ public class MotionDetector {
     private boolean workerIsRunning = true;
     private boolean firstRun = true;
 
+    public Surface getSurface() {
+        return mSurface.getHolder().getSurface();
+    }
+    public void fixSurfaces(){
+        // configure preview
+        previewHolder = mSurface.getHolder();
+        previewHolder.addCallback(surfaceCallback);
+        previewHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+    }
+
     class MotionDetectorThread extends Thread {
         private AtomicBoolean isRunning = new AtomicBoolean(true);
         private volatile boolean paused = false;
