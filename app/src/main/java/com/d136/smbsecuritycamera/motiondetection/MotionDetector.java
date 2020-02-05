@@ -196,6 +196,8 @@ public class MotionDetector {
         return mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA);
     }
 
+    public Camera getmCamera(){return mCamera;}
+
     private Camera getCameraInstance(){
         Camera c = null;
 

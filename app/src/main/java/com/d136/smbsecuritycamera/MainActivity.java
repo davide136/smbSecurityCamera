@@ -5,11 +5,15 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.hardware.Camera;
 import android.media.AudioManager;
+import android.media.CamcorderProfile;
+import android.media.MediaRecorder;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.preference.PreferenceManager;
 import android.text.InputType;
 import android.util.Log;
@@ -53,7 +57,6 @@ public class MainActivity extends AppCompatActivity {
 
     final static String TAG = "MAIN";
 
-    //App routine
     private EditText editIPv4;
     private Button btnConnect, btnRecord;
     private TextView textConnectionStatus, textRecordingStatus;
@@ -65,6 +68,11 @@ public class MainActivity extends AppCompatActivity {
     private Boolean detectorStarted=false;
     private SMBConnectionCallback smbConnectionCallback;
     private SurfaceView preview;
+    private MediaRecorder recorder;
+    private Camera camera;
+    private boolean recording = false;
+    private long lastRecordingTime;
+    private int time=5;
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
@@ -91,6 +99,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onMotionDetected() {
                 Log.w(TAG,"MOTION DETECTED");
+                record();
             }
 
             @Override
@@ -136,6 +145,85 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
+
+    // Camera and recording
+    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
+    private void record() {
+        if (!recording) {
+            recording = true;
+
+            prepareVideoRecorder();
+            recorder.start();
+
+            Handler handler = new Handler();
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    stopRecorder();
+                }
+            }, time*1000);
+        }
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
+    public void stopRecorder() {
+        //end recording and move to smb
+        recorder.stop();
+        Log.w(TAG,"STOPPED RECORDING");
+        copyToSMB();
+        Log.w(TAG,"MOVED TO SMB");
+        releaseMediaRecorder();
+        lastRecordingTime = System.currentTimeMillis();
+        textRecordingStatus.setText("SERVICE RUNNING");
+        textRecordingStatus.setTextColor(Color.BLUE);
+        recording = false;
+    }
+
+    private void releaseMediaRecorder(){
+        if (recorder != null) {
+            recorder.reset();   // clear recorder configuration
+        }
+    }
+
+
+    /** Check if this device has a camera */
+    private boolean checkCameraHardware(Context context) {
+        return context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA);
+    }
+
+    private void prepareVideoRecorder(){
+        // Step 1: Unlock and set camera to MediaRecorder
+        recorder = new MediaRecorder();
+        camera = motionDetector.getmCamera();
+        camera.unlock();
+        recorder.setCamera(camera);
+
+        // Step 2: Set sources
+        recorder.setAudioSource(MediaRecorder.AudioSource.CAMCORDER);
+        recorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
+
+        // Step 3: Set a CamcorderProfile (requires API Level 8 or higher)
+        recorder.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH));
+
+        // Step 4: Set output file
+        recorder.setOutputFile(getOutputMediaFile()+"");
+
+        // Step 5: Set the preview output
+        recorder.setPreviewDisplay(preview.getHolder().getSurface());
+
+        // Step 6: Prepare configured MediaRecorder
+        try {
+            recorder.prepare();
+        } catch (IllegalStateException e) {
+            Log.d(TAG, "IllegalStateException preparing MediaRecorder: " + e.getMessage());
+            releaseMediaRecorder();
+        } catch (IOException e) {
+            Log.d(TAG, "IOException preparing MediaRecorder: " + e.getMessage());
+            releaseMediaRecorder();
+        }
+
+    }
+
 
     private void initConnection() {
         smbConnection = new smbConnection(this);
@@ -237,18 +325,6 @@ public class MainActivity extends AppCompatActivity {
             default:
                 return super.onOptionsItemSelected(item);
         }
-    }
-
-    /** A safe way to get an instance of the Camera object. */
-    public static Camera getCameraInstance(){
-        Camera c = null;
-        try {
-            c = Camera.open(); // attempt to get a Camera instance
-        }
-        catch (Exception e){
-            Log.e(TAG,"Camera is not available (in use or does not exist");
-        }
-        return c; // returns null if camera is unavailable
     }
 
 
