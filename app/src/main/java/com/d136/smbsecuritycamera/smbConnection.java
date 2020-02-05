@@ -53,9 +53,6 @@ public class smbConnection extends AsyncTask<String, Void, Void> {
             mConnection = client.connect(ip,port);
             mSession = mConnection.authenticate(mAc);
             isSuccessful = true;
-        if (smbConnectionCallback != null )
-            smbConnectionCallback.onConnectionSuccessful();
-
         } catch (IOException e) {e.printStackTrace();}
         return null;
     }
@@ -63,6 +60,8 @@ public class smbConnection extends AsyncTask<String, Void, Void> {
     @Override
     protected void onPostExecute(Void session) {
         super.onPostExecute(session);
+        if (smbConnectionCallback != null )
+            smbConnectionCallback.onConnectionSuccessful();
         updateUI();
     }
 

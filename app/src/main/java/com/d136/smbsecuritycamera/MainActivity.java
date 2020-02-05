@@ -16,6 +16,7 @@ import android.os.Vibrator;
 import android.preference.PreferenceManager;
 import android.text.InputType;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -86,7 +87,7 @@ public class MainActivity extends AppCompatActivity {
         ip = sharedPreferences.getString("ip","");
         if(ip != "")
             editIPv4.setText(ip);
-        smbConnection = new smbConnection(this);
+        initConnection();
 
 
 
@@ -102,6 +103,8 @@ public class MainActivity extends AppCompatActivity {
                 textConnectionStatus.setText("Too dark here");
             }
         });
+        ////// Config Options//motionDetector.setCheckInterval(500);//motionDetector.setLeniency(20);//motionDetector.setMinLuma(1000);
+
         btnRecord.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -119,14 +122,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
-        smbConnectionCallback = new SMBConnectionCallback() {
-            @Override
-            public void onConnectionSuccessful() {
-                setShareName();
-            }
-        };
-////// Config Options//motionDetector.setCheckInterval(500);//motionDetector.setLeniency(20);//motionDetector.setMinLuma(1000);
-        smbConnection.setSMBConnectionCallback(smbConnectionCallback);
+
         btnConnect.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -135,18 +131,31 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     smbConnection.stop();
                     smbConnection.cancel(true);
+                    initConnection();
                     btnConnect.setText("Connect");
                 }
             }
         });
     }
 
+    private void initConnection() {
+        smbConnection = new smbConnection(this);
+        smbConnectionCallback = new SMBConnectionCallback() {
+            @Override
+            public void onConnectionSuccessful() {
+                setShareName();
+            }
+        };
+        smbConnection.setSMBConnectionCallback(smbConnectionCallback);
+    }
+
     private void setShareName() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Insert the name of the share to connect to:");
 
 // Set up the input
         final EditText input = new EditText(this);
+        input.setText(sharedPreferences.getString("shareName", null));
 // Specify the type of input expected; this, for example, sets the input as a password, and will mask the text
         input.setInputType(InputType.TYPE_CLASS_TEXT );
         builder.setView(input);
@@ -154,9 +163,9 @@ public class MainActivity extends AppCompatActivity {
         builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
-                input.setText(sharedPreferences.getString("shareName", null));
                 shareName = input.getText().toString();
                 sharedPreferences.edit().putString("shareName",shareName).apply();
+                testShareName();
             }
         });
         builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
@@ -168,6 +177,28 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         builder.show();
+    }
+
+    private void testShareName() {
+        DiskShare diskShare;
+        File destFile = null;
+        try{
+            diskShare = (DiskShare) smbConnection.getSession().connectShare(shareName);
+            Set<FileAttributes> fileAttributes = new HashSet<>();
+            fileAttributes.add(FileAttributes.FILE_ATTRIBUTE_NORMAL);
+            Set<SMB2CreateOptions> createOptions = new HashSet<>();
+            createOptions.add(SMB2CreateOptions.FILE_RANDOM_ACCESS);
+            destFile = diskShare.openFile("testRW",
+                    new HashSet<>(Collections.singletonList(AccessMask.GENERIC_ALL)),
+                    fileAttributes,
+                    SMB2ShareAccess.ALL,
+                    SMB2CreateDisposition.FILE_OVERWRITE_IF,
+                    createOptions);
+        }catch(Exception e){
+            textConnectionStatus.setTextColor(Color.RED);
+            textConnectionStatus.setText("ERR: Share not found!");
+        }
+        try{ destFile.deleteOnClose(); }catch (Exception ignore){}
     }
 
 
@@ -229,7 +260,6 @@ public class MainActivity extends AppCompatActivity {
     private void connect() {
         ip = editIPv4.getText().toString();
         sharedPreferences.edit().putString("ip",ip).apply();
-
         String[] params = {ip, port, user, password, shareName};
         smbConnection.execute(params);
         btnConnect.setText("Disconnect");
