@@ -6,13 +6,9 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
-import android.hardware.Camera;
 import android.media.AudioManager;
-import android.media.CamcorderProfile;
-import android.media.MediaRecorder;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.preference.PreferenceManager;
 import android.text.InputType;
 import android.util.Log;
@@ -29,8 +25,6 @@ import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.d136.smbsecuritycamera.motiondetection.MotionDetector;
-import com.d136.smbsecuritycamera.motiondetection.MotionDetectorCallback;
 import com.hierynomus.msdtyp.AccessMask;
 import com.hierynomus.msfscc.FileAttributes;
 import com.hierynomus.mssmb2.SMB2CreateDisposition;
@@ -49,7 +43,11 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -59,22 +57,13 @@ public class MainActivity extends AppCompatActivity {
     private EditText editIPv4;
     private Button btnConnect, btnRecord;
     private TextView textConnectionStatus, textRecordingStatus;
-    private String ip, port, user="", password="", shareName = "";
-    private java.io.File tmpVideo;
+    private String ip, port, shareName = "";
     private smbConnection smbConnection;
-    private MotionDetector motionDetector;
     private SharedPreferences sharedPreferences;
     private Boolean detectorStarted=false;
-    private SMBConnectionCallback smbConnectionCallback;
-    private SurfaceView preview;
-    private MediaRecorder recorder;
-    private Camera camera;
-    private boolean recording = false;
-    private long lastRecordingTime;
-    private int time=5;
+    private CustomRecorder customRecorder;
 
-    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
-    @Override
+
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
@@ -84,53 +73,66 @@ public class MainActivity extends AppCompatActivity {
         btnRecord = findViewById(R.id.btnRecord);
         textConnectionStatus = findViewById(R.id.textConnectionStatus);
         textRecordingStatus = findViewById(R.id.textRecordingStatus);
-        preview = findViewById(R.id.surfaceView);
+        SurfaceView preview = findViewById(R.id.surfaceView);
 
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         port = sharedPreferences.getString("port","445");
         ip = sharedPreferences.getString("ip","");
-        if(ip != "")
+        if(!ip.equals(""))
             editIPv4.setText(ip);
         initConnection();
 
-        motionDetector = new MotionDetector(this, preview);
-        motionDetector.setMotionDetectorCallback(new MotionDetectorCallback() {
+        customRecorder = new CustomRecorder(
+                preview,
+                this,
+                textRecordingStatus,
+                sharedPreferences
+        );
+        customRecorder.setCustomRecorderCallback(new CustomRecorderCallbacks() {
             @Override
-            public void onMotionDetected() {
-                Log.w(TAG,"MOTION DETECTED");
-                if(smbConnection.isConnected()){
-                    textRecordingStatus.setText("SERVICE RUNNING");
-                    textRecordingStatus.setTextColor(Color.BLUE);
-                    record();
-                }
-
+            public void onRecorderPrepared() {
+                Log.w(TAG,"RECORDER READY!");
+                textRecordingStatus.setText(R.string.recording);
+                textRecordingStatus.setTextColor(Color.RED);
             }
 
             @Override
-            public void onTooDark() {
-                Log.w(TAG,"TOO DARK");
+            public void onTimePassed() {
+                textRecordingStatus.setText(R.string.serviceStarted);
+                textRecordingStatus.setTextColor(Color.GREEN);
+                customRecorder.stop();
+            }
+
+            @RequiresApi(api = Build.VERSION_CODES.KITKAT)
+            @Override
+            public void onFileSaved() {
+                copyToSMB();
+                customRecorder.reset();
+            }
+
+            @Override
+            public void onPrepareFailed() {
+
             }
         });
 
-        ////// Config Options
-        //motionDetector.setCheckInterval(500);
-        //motionDetector.setLeniency(20);
-        //motionDetector.setMinLuma(1000);
+
         btnRecord.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 if(!detectorStarted)
                 {
-                    motionDetector.resumeDetection();
-                    btnRecord.setText("Service started");
+                    customRecorder.startService();
+                    btnRecord.setText(R.string.serviceStarted);
                     detectorStarted = true;
                 }
                 else
                 {
-                    motionDetector.pauseDetection();
-                    btnRecord.setText("Record");
+                    customRecorder.pauseService();
+                    btnRecord.setText(R.string.RecordBTN);
                     detectorStarted = false;
                 }
+
             }
         });
 
@@ -138,96 +140,28 @@ public class MainActivity extends AppCompatActivity {
         btnConnect.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (smbConnection == null || !smbConnection.isConnected()) {
-                    connect();
-                } else {
-                    smbConnection.stop();
-                    smbConnection.cancel(true);
-                    initConnection();
-                    btnConnect.setText("Connect");
+                ip = editIPv4.getText().toString();
+                if(validIP(ip)){
+                    if (smbConnection == null || !smbConnection.isConnected())
+                        connect();
+                    else {
+                        smbConnection.stop();
+                        smbConnection.cancel(true);
+                        initConnection();
+                        customRecorder.disconnectedWhileRunning();
+                        btnConnect.setText(R.string.ConnectBTN);
+                    }
+                }
+                else {
+                    editIPv4.setError("Wrong ip address");
                 }
             }
         });
     }
 
-    // Camera and recording
-    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
-    private void record() {
-        if (!recording) {
-            recording = true;
-            motionDetector.pauseDetection();
-            prepareVideoRecorder();
-            recorder.start();
-            textRecordingStatus.setText("RECORDING");
-            textRecordingStatus.setTextColor(Color.RED);
-            Handler handler = new Handler();
-            handler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    stopRecorder();
-                    motionDetector.resumeDetection();
-                }
-            }, time*1000);
-        }
-    }
-
-    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
-    public void stopRecorder() {
-        //end recording and move to smb
-        recorder.stop();
-        Log.w(TAG,"STOPPED RECORDING");
-        copyToSMB();
-        Log.w(TAG,"MOVED TO SMB");
-        releaseMediaRecorder();
-        textRecordingStatus.setText("SERVICE RUNNING");
-        textRecordingStatus.setTextColor(Color.BLUE);
-        motionDetector.fixSurfaces();
-        recording = false;
-    }
-
-    private void releaseMediaRecorder(){
-        if (recorder != null) {
-            recorder.reset();   // clear recorder configuration
-        }
-    }
-
-    private void prepareVideoRecorder(){
-        // Step 1: Unlock and set camera to MediaRecorder
-        recorder = new MediaRecorder();
-        camera = motionDetector.getmCamera();
-        camera.unlock();
-        recorder.setCamera(camera);
-
-        // Step 2: Set sources
-        recorder.setAudioSource(MediaRecorder.AudioSource.CAMCORDER);
-        recorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
-
-        // Step 3: Set a CamcorderProfile (requires API Level 8 or higher)
-        recorder.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH));
-
-        // Step 4: Set output file
-        recorder.setOutputFile(getOutputMediaFile()+"");
-
-        // Step 5: Set the preview output
-        recorder.setPreviewDisplay(motionDetector.getSurface());
-
-        // Step 6: Prepare configured MediaRecorder
-        try {
-            recorder.prepare();
-        } catch (IllegalStateException e) {
-            Log.d(TAG, "IllegalStateException preparing MediaRecorder: " + e.getMessage());
-            releaseMediaRecorder();
-        } catch (IOException e) {
-            Log.d(TAG, "IOException preparing MediaRecorder: " + e.getMessage());
-            releaseMediaRecorder();
-        }
-
-    }
-
-
     private void initConnection() {
         smbConnection = new smbConnection(this);
-        smbConnectionCallback = new SMBConnectionCallback() {
+        SMBConnectionCallback smbConnectionCallback = new SMBConnectionCallback() {
             @Override
             public void onConnectionSuccessful() {
                 setShareName();
@@ -283,24 +217,47 @@ public class MainActivity extends AppCompatActivity {
                     createOptions);
         }catch(Exception e){
             textConnectionStatus.setTextColor(Color.RED);
-            textConnectionStatus.setText("ERR: Share not found!");
+            textConnectionStatus.setText(R.string.err_sharenotfound);
         }
-        try{ destFile.deleteOnClose(); }catch (Exception ignore){}
+        try{
+            assert destFile != null;
+            destFile.deleteOnClose(); }catch (Exception ignore){}
+    }
+
+    private static boolean validIP(String ip) {
+        if (ip == null || ip.isEmpty()) return false;
+        ip = ip.trim();
+        if (ip.length() < 6 & ip.length() > 15) return false;
+
+        try {
+            Pattern pattern = Pattern.compile("^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$");
+            Matcher matcher = pattern.matcher(ip);
+            return matcher.matches();
+        } catch (PatternSyntaxException ex) {
+            return false;
+        }
     }
 
 
+    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
     protected void onResume() {
         super.onResume();
+        disableAudio();
 //        if(detectorStarted)
-            motionDetector.onResume();
+//            motionDetector.onResume();
+        customRecorder.onResume();
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
     protected void onPause() {
+        enableAudio();
         super.onPause();
 //        if(detectorStarted)
-            motionDetector.onPause();
+//            motionDetector.onPause();
+        customRecorder.onPause();
+
     }
 
     @Override
@@ -328,23 +285,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-
-
-    // File management
-    // SISTEMARE IP PRIMA DELLA RELEASE
     private void connect() {
-        ip = editIPv4.getText().toString();
         sharedPreferences.edit().putString("ip",ip).apply();
-        user = sharedPreferences.getString("user",null);
-        password = sharedPreferences.getString("password",null);
+        String user = sharedPreferences.getString("user", "");
+        String password = sharedPreferences.getString("password", "");
 
         String[] params = {ip, port, user, password, shareName};
         smbConnection.execute(params);
-        btnConnect.setText("Disconnect");
+        btnConnect.setText(R.string.DisconnectBTN);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     private void copyToSMB() {
+        java.io.File tmpVideo = customRecorder.getFile();
         DiskShare diskShare = (DiskShare) smbConnection.getSession().connectShare(shareName);
         Set<FileAttributes> fileAttributes = new HashSet<>();
         fileAttributes.add(FileAttributes.FILE_ATTRIBUTE_NORMAL);
@@ -376,51 +329,26 @@ public class MainActivity extends AppCompatActivity {
         if(!tmpVideo.delete()) Log.w(TAG,"Something went wrong.");
     }
 
-    private java.io.File getOutputMediaFile(){
-        // To be safe, you should check that the SDCard is mounted
-        // using Environment.getExternalStorageState() before doing this.
-
-        java.io.File mediaStorageDir = new java.io.File(this.getCacheDir(), "TEMPVideos");
-        // This location works best if you want the created images to be shared
-        // between applications and persist after your app has been uninstalled.
-
-        // Create the storage directory if it does not exist
-        if (! mediaStorageDir.exists()){
-            if (! mediaStorageDir.mkdirs()){
-                Log.d("MyCameraApp", "failed to create directory");
-                return null;
-            }
-        }
-
-        // Create a media file name
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
-        java.io.File mediaFile;
-        mediaFile = new java.io.File(mediaStorageDir.getPath() + java.io.File.separator +
-                "VID_"+ timeStamp + ".mp4");
-        tmpVideo = mediaFile;
-        return mediaFile;
-    }
-
-
-
+    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     private void enableAudio(){
         // re-enable sound after recording.
-        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_ALARM,false);
-        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_DTMF,false);
-        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_MUSIC,false);
-        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_RING,false);
-        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_SYSTEM,false);
-        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_VOICE_CALL,false);
+        ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_ALARM,false);
+        ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_DTMF,false);
+        ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_MUSIC,false);
+        ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_RING,false);
+        ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_SYSTEM,false);
+        ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_VOICE_CALL,false);
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     private void disableAudio() {
         // disable sound when recording.
-        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_ALARM,true);
-        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_DTMF,true);
-        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_MUSIC,true);
-        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_RING,true);
-        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_SYSTEM,true);
-        ((AudioManager)this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE)).setStreamMute(AudioManager.STREAM_VOICE_CALL,true);
+        ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_ALARM,true);
+        ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_DTMF,true);
+        ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_MUSIC,true);
+        ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_RING,true);
+        ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_SYSTEM,true);
+        ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_VOICE_CALL,true);
 
     }
 

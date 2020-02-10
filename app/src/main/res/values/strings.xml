@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">Smb Security Camera</string>
+    <string name="recording">RECORDING</string>
+    <string name="serviceStarted">Service started</string>
+    <string name="RecordBTN">Record</string>
+    <string name="ConnectBTN">Connect</string>
+    <string name="err_sharenotfound">ERR: Share not found!</string>
+    <string name="DisconnectBTN">Disconnect</string>
+    <string name="ServiceStarted">Service started</string>
+    <string name="ServicePaused">Service paused</string>
 </resources>

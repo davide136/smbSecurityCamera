@@ -8,7 +8,7 @@ import androidx.preference.PreferenceFragmentCompat;
 
 public class MySettingsFragment extends PreferenceFragmentCompat {
     private static String TAG = "PreferenceFragment";
-    Preference portPref, customPortPref, userPref, passwordPref;
+    private Preference portPref;
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -34,8 +34,12 @@ public class MySettingsFragment extends PreferenceFragmentCompat {
             }
         });
 
-        customPortPref = findPreference("portEnabled");
+
+
+        Preference customPortPref = findPreference("portEnabled");
         assert customPortPref != null;
+        if(!customPortPref.getSharedPreferences().getBoolean("portEnabled",false))
+            portPref.setEnabled(false);
         customPortPref.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
             @Override
             public boolean onPreferenceChange(Preference preference, Object newValue) {
@@ -48,7 +52,7 @@ public class MySettingsFragment extends PreferenceFragmentCompat {
                     return true;
         }});
 
-        userPref = findPreference("user");
+        Preference userPref = findPreference("user");
         assert userPref != null;
         userPref.setSummary(userPref.getSharedPreferences().getString("user",null));
         userPref.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
@@ -59,7 +63,7 @@ public class MySettingsFragment extends PreferenceFragmentCompat {
             }
         });
 
-        passwordPref = findPreference("password");
+        Preference passwordPref = findPreference("password");
         assert passwordPref != null;
         passwordPref.setSummary(passwordPref.getSharedPreferences().getString("password",null));
         passwordPref.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
@@ -70,5 +74,83 @@ public class MySettingsFragment extends PreferenceFragmentCompat {
             }
         });
 
+        final Preference timePref = findPreference("time");
+        assert timePref != null;
+        timePref.setSummary(timePref.getSharedPreferences().getString("time","5"));
+        timePref.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                try{
+                    int temp = Integer.valueOf((String) newValue);
+                }catch(Exception e){
+                    preference.setSummary(newValue+" is not a valid input. Set to 5 seconds.");
+                    timePref.getSharedPreferences().edit().putString("time","5").apply();
+                    return true;
+                }
+                preference.setSummary(newValue+"");
+                return true;
+            }
+        });
+
+
+        final Preference freqPref = findPreference("frequency");
+        assert freqPref != null;
+        freqPref.setSummary(freqPref.getSharedPreferences().getString("frequency","500"));
+        freqPref.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                try{
+                    int temp = Integer.valueOf((String) newValue);
+                }catch(Exception e){
+                    preference.setSummary(newValue+" is not a valid input. Set to 500 milli seconds.");
+                    timePref.getSharedPreferences().edit().putString("frequency","500").apply();
+                    return true;
+                }
+                preference.setSummary(newValue+"");
+                return true;
+            }
+        });
+
+
+
+        final Preference tolerPref = findPreference("tolerance");
+        assert tolerPref != null;
+        tolerPref.setSummary(tolerPref.getSharedPreferences().getString("tolerance","20"));
+        tolerPref.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                try{
+                    int temp = Integer.valueOf((String) newValue);
+                }catch(Exception e){
+                    preference.setSummary(newValue+" is not a valid input. Set to 20 units.");
+                    tolerPref.getSharedPreferences().edit().putString("tolerance","20").apply();
+                    return true;
+                }
+                preference.setSummary(newValue+"");
+                return true;
+            }
+        });
+
+
+
+        final Preference lumaPref = findPreference("luma");
+        assert lumaPref != null;
+        lumaPref.setSummary(lumaPref.getSharedPreferences().getString("luma","1000"));
+        lumaPref.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                try{
+                    int temp = Integer.valueOf((String) newValue);
+                }catch(Exception e){
+                    preference.setSummary(newValue+" is not a valid input. Set to 20 units.");
+                    lumaPref.getSharedPreferences().edit().putString("luma","1000").apply();
+                    return true;
+                }
+                preference.setSummary(newValue+"");
+                return true;
+            }
+        });
+
     }
+
 }

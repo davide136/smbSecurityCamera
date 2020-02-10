@@ -3,6 +3,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Matrix;
+import android.util.Log;
 
 import java.io.ByteArrayOutputStream;
 
@@ -99,19 +100,23 @@ public abstract class ImageProcessing {
      * @throws NullPointerException
      *             if yuv420sp byte array is NULL.
      */
-    public static int[] decodeYUV420SPtoLuma(byte[] yuv420sp, int width, int height) {
+    static int[] decodeYUV420SPtoLuma(byte[] yuv420sp, int width, int height) {
         if (yuv420sp == null) throw new NullPointerException();
 
         final int frameSize = width * height;
         int[] hsl = new int[frameSize];
-
+        try {
         for (int j = 0, yp = 0; j < height; j++) {
             for (int i = 0; i < width; i++, yp++) {
-                int y = (0xff & (yuv420sp[yp])) - 16;
-                if (y < 0) y = 0;
-                hsl[yp] = y;
+
+                    int y = (0xff & (yuv420sp[yp])) - 16;
+                    if (y < 0) y = 0;
+                    hsl[yp] = y;
+
             }
-        }
+        }}catch(IndexOutOfBoundsException e){
+            Log.e("RGBDecoder",e.getLocalizedMessage());
+        return  hsl;}
         return hsl;
     }
 
@@ -217,7 +222,7 @@ public abstract class ImageProcessing {
      *            Degrees to rotate.
      * @return Bitmap which was rotated.
      */
-    public static Bitmap rotate(Bitmap bmp, int degrees) {
+    private static Bitmap rotate(Bitmap bmp, int degrees) {
         if (bmp == null) throw new NullPointerException();
 
         // getting scales of the image

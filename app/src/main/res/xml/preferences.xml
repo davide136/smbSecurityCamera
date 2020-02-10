@@ -21,4 +21,24 @@
         app:title="Password"
         app:summary=""/>
 
+    <EditTextPreference
+        app:key="time"
+        app:title="Recording duration"
+        app:summary=""/>
+
+    <EditTextPreference
+        app:key="frequency"
+        app:title="Frequency for motion detection"
+        app:summary=""/>
+
+    <EditTextPreference
+        app:key="tolerance"
+        app:title="Difference tolerance for motion detection"
+        app:summary=""/>
+
+    <EditTextPreference
+        app:key="luma"
+        app:title="Light tolerance for motion detection"
+        app:summary=""/>
+
 </PreferenceScreen>

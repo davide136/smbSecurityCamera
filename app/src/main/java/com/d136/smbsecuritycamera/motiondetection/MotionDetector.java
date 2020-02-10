@@ -20,11 +20,26 @@ public class MotionDetector {
     public Surface getSurface() {
         return mSurface.getHolder().getSurface();
     }
-    public void fixSurfaces(){
-        // configure preview
-        previewHolder = mSurface.getHolder();
-        previewHolder.addCallback(surfaceCallback);
-        previewHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+
+    private int mWidth, mHeight;
+    public void fixCamera(){
+        try {
+            mCamera.setPreviewDisplay(previewHolder);
+            mCamera.setPreviewCallback(previewCallback);
+            Camera.Parameters parameters = mCamera.getParameters();
+            Camera.Size size = getBestPreviewSize(mWidth, mHeight, parameters);
+            if (size != null) {
+                parameters.setPreviewSize(size.width, size.height);
+                Log.d("MotionDetector", "Using width=" + size.width + " height=" + size.height);
+            }
+            mCamera.setParameters(parameters);
+
+
+        } catch (Throwable t) {
+            Log.e("MotionDetector", "Exception in setPreviewDisplay()", t);
+        }
+
+
     }
 
     class MotionDetectorThread extends Thread {
@@ -35,7 +50,7 @@ public class MotionDetector {
 
 
 
-        public void stopDetection() {
+        void stopDetection() {
             isRunning.set(false);
         }
 
@@ -117,11 +132,11 @@ public class MotionDetector {
 
         }
 
-        public void pause() {
+        void pause() {
             paused = true;
         }
 
-        public void resumE() {
+        void resumE() {
             synchronized (pauseLock) {
                 paused = false;
                 pauseLock.notifyAll(); // Unblocks thread
@@ -165,7 +180,7 @@ public class MotionDetector {
         this.motionDetectorCallback = motionDetectorCallback;
     }
 
-    public void consume(byte[] data, int width, int height) {
+    private void consume(byte[] data, int width, int height) {
         nextData.set(data);
         nextWidth.set(width);
         nextHeight.set(height);
@@ -257,8 +272,10 @@ public class MotionDetector {
          */
         @Override
         public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+            mWidth = width;
+            mHeight = height;
             Camera.Parameters parameters = mCamera.getParameters();
-            Camera.Size size = getBestPreviewSize(width, height, parameters);
+            Camera.Size size = getBestPreviewSize(mWidth, mHeight, parameters);
             if (size != null) {
                 parameters.setPreviewSize(size.width, size.height);
                 Log.d("MotionDetector", "Using width=" + size.width + " height=" + size.height);
