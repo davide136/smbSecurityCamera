@@ -8,4 +8,17 @@
     <string name="DisconnectBTN">Disconnect</string>
     <string name="ServiceStarted">Service started</string>
     <string name="ServicePaused">Service paused</string>
+    <string name="preferences_menu">Preferences</string>
+    <string name="about">About</string>
+    <string name="about_description">Your support is much appreciated, don\'t forget to contact me to give suggestions or report any problem! I\'ll try my best to help everybody!</string>
+    <string name="thank_you">Thank you!</string>
+    <string name="support_email"><u>Contact me</u></string>
+    <string name="mail">davide136@gmail.com</string>
+    <string name="header">SMB v1, v2 and v3 supported.</string>
+    <string name="enter_ip_v4_address">Enter ip v4 address:</string>
+    <string name="ip_address">ip address</string>
+    <string name="connect">CONNECT</string>
+    <string name="start_service">START SERVICE</string>
+    <string name="connection_status">Connection status:</string>
+    <string name="recording_status">Recording status:</string>
 </resources>

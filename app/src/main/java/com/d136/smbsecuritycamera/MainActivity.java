@@ -25,6 +25,8 @@ import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.d136.smbsecuritycamera.about.AboutActivity;
+import com.d136.smbsecuritycamera.preferences.MyPreferencesActivity;
 import com.hierynomus.msdtyp.AccessMask;
 import com.hierynomus.msfscc.FileAttributes;
 import com.hierynomus.mssmb2.SMB2CreateDisposition;
@@ -243,19 +245,19 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        disableAudio();
-//        if(detectorStarted)
-//            motionDetector.onResume();
+        try{
+            disableAudio();
+        }catch (Exception ignore){}
         customRecorder.onResume();
     }
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
     protected void onPause() {
-        enableAudio();
+        try{
+            enableAudio();
+        }catch (Exception ignore){}
         super.onPause();
-//        if(detectorStarted)
-//            motionDetector.onPause();
         customRecorder.onPause();
 
     }
@@ -272,12 +274,14 @@ public class MainActivity extends AppCompatActivity {
         // Handle item selection
         switch (item.getItemId()) {
             case R.id.settings:
-                Intent i = new Intent(this, MySettingsActivity.class);
+                Intent i = new Intent(this, MyPreferencesActivity.class);
                 startActivity(i);
                 (this).overridePendingTransition(0, 0);
                 return true;
             case R.id.about:
-//                about();
+                Intent g = new Intent(this, AboutActivity.class);
+                startActivity(g);
+                (this).overridePendingTransition(0, 0);
                 return true;
             default:
                 return super.onOptionsItemSelected(item);

@@ -1,4 +1,4 @@
-package com.d136.smbsecuritycamera;
+package com.d136.smbsecuritycamera.preferences;
 
 import android.os.Bundle;
 
@@ -6,7 +6,9 @@ import androidx.annotation.Nullable;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 
-public class MySettingsFragment extends PreferenceFragmentCompat {
+import com.d136.smbsecuritycamera.R;
+
+public class MyPreferencesFragment extends PreferenceFragmentCompat {
     private static String TAG = "PreferenceFragment";
     private Preference portPref;
 
