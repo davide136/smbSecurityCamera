@@ -1,12 +1,15 @@
 package com.d136.smbsecuritycamera;
 
 
+import android.Manifest;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.media.AudioManager;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
@@ -17,6 +20,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.SurfaceView;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -24,6 +28,7 @@ import android.widget.TextView;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import com.d136.smbsecuritycamera.about.AboutActivity;
 import com.d136.smbsecuritycamera.preferences.MyPreferencesActivity;
@@ -54,7 +59,10 @@ import java.util.regex.PatternSyntaxException;
 
 public class MainActivity extends AppCompatActivity {
 
-    final static String TAG = "MAIN";
+    private static final String TAG = "MAIN";
+
+    private static final String SHARE_NOT_FOUND = "ERR: Share not found!";
+    private static final String SHARE_FOUND = "Connected";
 
     private EditText editIPv4;
     private Button btnConnect, btnRecord;
@@ -69,6 +77,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        this.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
         //init layout
         editIPv4 = findViewById(R.id.editIPv4);
         btnConnect = findViewById(R.id.btnConnect);
@@ -76,12 +85,12 @@ public class MainActivity extends AppCompatActivity {
         textConnectionStatus = findViewById(R.id.textConnectionStatus);
         textRecordingStatus = findViewById(R.id.textRecordingStatus);
         SurfaceView preview = findViewById(R.id.surfaceView);
-
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         port = sharedPreferences.getString("port","445");
         ip = sharedPreferences.getString("ip","");
         if(!ip.equals(""))
             editIPv4.setText(ip);
+        checkPermissions();
         initConnection();
 
         customRecorder = new CustomRecorder(
@@ -108,7 +117,7 @@ public class MainActivity extends AppCompatActivity {
             @RequiresApi(api = Build.VERSION_CODES.KITKAT)
             @Override
             public void onFileSaved() {
-                copyToSMB();
+                new AsyncCopyToSMB().execute();
                 customRecorder.reset();
             }
 
@@ -161,6 +170,24 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void checkPermissions() {
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED
+        )
+        {
+            Intent intent = new Intent(MainActivity.this, IntroActivity.class);
+            startActivity(intent);
+            super.finish();
+        }
+    }
+
     private void initConnection() {
         smbConnection = new smbConnection(this);
         SMBConnectionCallback smbConnectionCallback = new SMBConnectionCallback() {
@@ -188,7 +215,7 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(DialogInterface dialog, int which) {
                 shareName = input.getText().toString();
                 sharedPreferences.edit().putString("shareName",shareName).apply();
-                testShareName();
+                new AsyncTestShareName().execute();
             }
         });
         builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
@@ -200,30 +227,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         builder.show();
-    }
-
-    private void testShareName() {
-        DiskShare diskShare;
-        File destFile = null;
-        try{
-            diskShare = (DiskShare) smbConnection.getSession().connectShare(shareName);
-            Set<FileAttributes> fileAttributes = new HashSet<>();
-            fileAttributes.add(FileAttributes.FILE_ATTRIBUTE_NORMAL);
-            Set<SMB2CreateOptions> createOptions = new HashSet<>();
-            createOptions.add(SMB2CreateOptions.FILE_RANDOM_ACCESS);
-            destFile = diskShare.openFile("testRW",
-                    new HashSet<>(Collections.singletonList(AccessMask.GENERIC_ALL)),
-                    fileAttributes,
-                    SMB2ShareAccess.ALL,
-                    SMB2CreateDisposition.FILE_OVERWRITE_IF,
-                    createOptions);
-        }catch(Exception e){
-            textConnectionStatus.setTextColor(Color.RED);
-            textConnectionStatus.setText(R.string.err_sharenotfound);
-        }
-        try{
-            assert destFile != null;
-            destFile.deleteOnClose(); }catch (Exception ignore){}
     }
 
     private static boolean validIP(String ip) {
@@ -239,7 +242,6 @@ public class MainActivity extends AppCompatActivity {
             return false;
         }
     }
-
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
@@ -288,7 +290,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
     private void connect() {
         sharedPreferences.edit().putString("ip",ip).apply();
         String user = sharedPreferences.getString("user", "");
@@ -297,40 +298,6 @@ public class MainActivity extends AppCompatActivity {
         String[] params = {ip, port, user, password, shareName};
         smbConnection.execute(params);
         btnConnect.setText(R.string.DisconnectBTN);
-    }
-
-    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
-    private void copyToSMB() {
-        java.io.File tmpVideo = customRecorder.getFile();
-        DiskShare diskShare = (DiskShare) smbConnection.getSession().connectShare(shareName);
-        Set<FileAttributes> fileAttributes = new HashSet<>();
-        fileAttributes.add(FileAttributes.FILE_ATTRIBUTE_NORMAL);
-        Set<SMB2CreateOptions> createOptions = new HashSet<>();
-        createOptions.add(SMB2CreateOptions.FILE_RANDOM_ACCESS);
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss",Locale.getDefault()).format(new Date());
-        String path =  "REC_" + timeStamp + ".mp4";
-        File destFile = diskShare.openFile(path,
-                new HashSet<>(Collections.singletonList(AccessMask.GENERIC_ALL)),
-                fileAttributes,
-                SMB2ShareAccess.ALL,
-                SMB2CreateDisposition.FILE_OVERWRITE_IF,
-                createOptions);
-
-        try (InputStream in = new FileInputStream(tmpVideo)) {
-            try (OutputStream out = destFile.getOutputStream()) {
-                // Transfer bytes from in to out
-                byte[] buf = new byte[1024];
-                int len;
-                while ((len = in.read(buf)) > 0) {
-                    out.write(buf, 0, len);
-                }
-            }
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        if(!tmpVideo.delete()) Log.w(TAG,"Something went wrong.");
     }
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
@@ -356,4 +323,80 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    private class AsyncTestShareName extends AsyncTask<Void, Void, String> {
+
+        @Override
+        protected String doInBackground(Void... strings) {
+            DiskShare diskShare;
+            File destFile = null;
+            String result = SHARE_FOUND;
+            try{
+                diskShare = (DiskShare) smbConnection.connect(shareName);
+                Set<FileAttributes> fileAttributes = new HashSet<>();
+                fileAttributes.add(FileAttributes.FILE_ATTRIBUTE_NORMAL);
+                Set<SMB2CreateOptions> createOptions = new HashSet<>();
+                createOptions.add(SMB2CreateOptions.FILE_RANDOM_ACCESS);
+                destFile = diskShare.openFile("testRW",
+                        new HashSet<>(Collections.singletonList(AccessMask.GENERIC_ALL)),
+                        fileAttributes,
+                        SMB2ShareAccess.ALL,
+                        SMB2CreateDisposition.FILE_OVERWRITE_IF,
+                        createOptions);
+            }catch(Exception e){
+                result = SHARE_NOT_FOUND;
+            }
+            try{
+                assert destFile != null;
+                destFile.deleteOnClose(); }catch (Exception ignore){}
+            return result;
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            super.onPostExecute(s);
+            if(s.equals(SHARE_NOT_FOUND)){
+                textConnectionStatus.setTextColor(Color.RED);
+                textConnectionStatus.setText(R.string.err_sharenotfound);
+            }
+        }
+    }
+
+    private class AsyncCopyToSMB extends AsyncTask<Void, Void, Void> {
+
+        @RequiresApi(api = Build.VERSION_CODES.KITKAT)
+        @Override
+        protected Void doInBackground(Void... voids) {
+            java.io.File tmpVideo = customRecorder.getFile();
+            DiskShare diskShare = (DiskShare) smbConnection.getSession().connectShare(shareName);
+            Set<FileAttributes> fileAttributes = new HashSet<>();
+            fileAttributes.add(FileAttributes.FILE_ATTRIBUTE_NORMAL);
+            Set<SMB2CreateOptions> createOptions = new HashSet<>();
+            createOptions.add(SMB2CreateOptions.FILE_RANDOM_ACCESS);
+            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss",Locale.getDefault()).format(new Date());
+            String path =  "REC_" + timeStamp + ".mp4";
+            File destFile = diskShare.openFile(path,
+                    new HashSet<>(Collections.singletonList(AccessMask.GENERIC_ALL)),
+                    fileAttributes,
+                    SMB2ShareAccess.ALL,
+                    SMB2CreateDisposition.FILE_OVERWRITE_IF,
+                    createOptions);
+
+            try (InputStream in = new FileInputStream(tmpVideo)) {
+                try (OutputStream out = destFile.getOutputStream()) {
+                    // Transfer bytes from in to out
+                    byte[] buf = new byte[1024];
+                    int len;
+                    while ((len = in.read(buf)) > 0) {
+                        out.write(buf, 0, len);
+                    }
+                }
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            if(!tmpVideo.delete()) Log.w(TAG,"Something went wrong.");
+            return null;
+        }
+    }
 }

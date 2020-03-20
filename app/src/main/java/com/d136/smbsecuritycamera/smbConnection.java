@@ -13,6 +13,7 @@ import com.hierynomus.smbj.SMBClient;
 import com.hierynomus.smbj.auth.AuthenticationContext;
 import com.hierynomus.smbj.connection.Connection;
 import com.hierynomus.smbj.session.Session;
+import com.hierynomus.smbj.share.DiskShare;
 
 import java.io.IOException;
 
@@ -92,5 +93,9 @@ public class smbConnection extends AsyncTask<String, Void, Void> {
             e.printStackTrace();
         }
         updateUI();
+    }
+
+    public Object connect(String shareName) {
+        return mSession.connectShare(shareName);
     }
 }
