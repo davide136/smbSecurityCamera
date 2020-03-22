@@ -5,4 +5,5 @@ public interface CustomRecorderCallbacks {
     void onTimePassed();
     void onFileSaved();
     void onPrepareFailed();
+    void recordStarted();
 }

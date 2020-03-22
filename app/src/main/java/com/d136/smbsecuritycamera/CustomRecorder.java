@@ -15,6 +15,9 @@ import com.d136.smbsecuritycamera.motiondetection.MotionDetector;
 import com.d136.smbsecuritycamera.motiondetection.MotionDetectorCallback;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 class CustomRecorder {
     private static String TAG="CustomRecorder";
@@ -64,11 +67,10 @@ class CustomRecorder {
         motionDetector.setCheckInterval(Integer.valueOf(sharedPreferences.getString("frequency","500")));
         motionDetector.setLeniency(Integer.valueOf(sharedPreferences.getString("tolerance","20")));
         motionDetector.setMinLuma(Integer.valueOf(sharedPreferences.getString("luma","1000")));
-
         prepareVideoRecorder();
         recorder.start();
         recording = true;
-
+        customRecorderCallbacks.recordStarted();
         Handler handler = new Handler();
         handler.postDelayed(new Runnable() {
             @Override
@@ -83,15 +85,18 @@ class CustomRecorder {
     java.io.File getFile(){ return file; }
 
     private void getOutputMediaFile(){
-        java.io.File mediaStorageDir = new java.io.File(context.getCacheDir(), "TEMPVideos");
+        java.io.File mediaStorageDir = new java.io.File(String.valueOf(context.getCacheDir()));
 
         if (! mediaStorageDir.exists()){
             if (! mediaStorageDir.mkdirs()){
                 Log.d(TAG, "failed to create temp directory");
             }
         }
+
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+        String file_name =  "REC_" + timeStamp + ".mp4";
         file = new java.io.File(mediaStorageDir.getPath() + java.io.File.separator +
-                "temp.mp4");
+                file_name );
     }
 
     private void prepareVideoRecorder(){
@@ -138,14 +143,14 @@ class CustomRecorder {
     }
 
     void startService() {
-        textRecordingStatus.setText(R.string.ServiceStarted);
-        textRecordingStatus.setTextColor(Color.GREEN);
+//        textRecordingStatus.setText(R.string.ServiceStarted);
+//        textRecordingStatus.setTextColor(Color.GREEN);
         motionDetector.resumeDetection();
     }
 
     void pauseService() {
-        textRecordingStatus.setText(R.string.ServicePaused);
-        textRecordingStatus.setTextColor(Color.BLUE);
+//        textRecordingStatus.setText(R.string.ServicePaused);
+//        textRecordingStatus.setTextColor(Color.BLUE);
         recording = false;
         cameraLocked = true;
         if(recorder!=null)

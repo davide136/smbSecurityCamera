@@ -19,7 +19,9 @@
     <string name="ip_address">ip address</string>
     <string name="connect">CONNECT</string>
     <string name="start_service">START SERVICE</string>
+    <string name="stop_service">STOP SERVICE</string>
     <string name="connection_status">Connection status:</string>
     <string name="recording_status">Recording status:</string>
     <string name="permission_info">To make the app work we need to enable the following permissions:</string>
+    <string name="err_connfailed">ERR: Failed</string>
 </resources>

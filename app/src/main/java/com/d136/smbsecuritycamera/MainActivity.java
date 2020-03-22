@@ -45,11 +45,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.text.SimpleDateFormat;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -61,18 +58,19 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MAIN";
 
-    private static final String SHARE_NOT_FOUND = "ERR: Share not found!";
-    private static final String SHARE_FOUND = "Connected";
+    private static int SMB_STATUS = 0, RECORD_SERVICE = 0;
+    private static final int CONNECTION_SUCCESSFUL = 129, DISCONNECTED = 128,
+            SHARE_FOUND = 127, SHARE_NOT_FOUND =126, CONNECTION_FAILED = 131;
+    private static final int RECORDING = 123, SERVICE_RUNNING = 124, SERVICE_STOPPED = 125, SERVICE_PAUSED = 132;
 
     private EditText editIPv4;
     private Button btnConnect, btnRecord;
     private TextView textConnectionStatus, textRecordingStatus;
-    private String ip, port, shareName = "";
+    private String ip, port, shareName = "", current_ip = "";
     private smbConnection smbConnection;
     private SharedPreferences sharedPreferences;
-    private Boolean detectorStarted=false;
     private CustomRecorder customRecorder;
-
+    private boolean skip_share_test = false;
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -103,71 +101,120 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onRecorderPrepared() {
                 Log.w(TAG,"RECORDER READY!");
-                textRecordingStatus.setText(R.string.recording);
-                textRecordingStatus.setTextColor(Color.RED);
             }
 
             @Override
             public void onTimePassed() {
-                textRecordingStatus.setText(R.string.serviceStarted);
-                textRecordingStatus.setTextColor(Color.GREEN);
                 customRecorder.stop();
             }
 
             @RequiresApi(api = Build.VERSION_CODES.KITKAT)
             @Override
             public void onFileSaved() {
-                new AsyncCopyToSMB().execute();
+                if( getFolderSize(getApplicationContext().getCacheDir()) / (1024*1024) > 0 )  //more than 100 Megabytes
+                    new AsyncCopyToSMB().execute();
                 customRecorder.reset();
+                RECORD_SERVICE = SERVICE_RUNNING;
+                updateUI();
             }
 
             @Override
             public void onPrepareFailed() {
+                RECORD_SERVICE = SERVICE_STOPPED;
+                updateUI();
+            }
 
+            @Override
+            public void recordStarted() {
+                RECORD_SERVICE = RECORDING;
+                updateUI();
             }
         });
-
 
         btnRecord.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(!detectorStarted)
-                {
-                    customRecorder.startService();
-                    btnRecord.setText(R.string.serviceStarted);
-                    detectorStarted = true;
+                switch(RECORD_SERVICE){
+                    case SERVICE_RUNNING:{
+                        customRecorder.pauseService();
+                        RECORD_SERVICE = SERVICE_PAUSED;
+                        break;
+                    }
+                    case 0:
+                    case SERVICE_PAUSED:
+                    case SERVICE_STOPPED:{
+                        customRecorder.startService();
+                        RECORD_SERVICE = SERVICE_RUNNING;
+                        break;
+                    }
+                    case RECORDING:{
+                        customRecorder.stop();
+                        customRecorder.pauseService();
+                        RECORD_SERVICE = SERVICE_PAUSED;
+                        break;
+                    }
                 }
-                else
-                {
-                    customRecorder.pauseService();
-                    btnRecord.setText(R.string.RecordBTN);
-                    detectorStarted = false;
-                }
-
+                updateUI();
             }
         });
 
-
         btnConnect.setOnClickListener(new View.OnClickListener() {
+            class AsyncStopSMBConnection extends AsyncTask<Void,Void,Void> {
+                @Override
+                protected Void doInBackground(Void... voids) {
+                    smbConnection.stop();
+                    return null;
+                }
+
+                @Override
+                protected void onPostExecute(Void aVoid) {
+                    super.onPostExecute(aVoid);
+                    SMB_STATUS = DISCONNECTED;
+                    updateUI();
+                }
+            }
+
             @Override
             public void onClick(View v) {
                 ip = editIPv4.getText().toString();
                 if(validIP(ip)){
-                    if (smbConnection == null || !smbConnection.isConnected())
-                        connect();
-                    else {
-                        smbConnection.stop();
-                        smbConnection.cancel(true);
-                        initConnection();
-                        customRecorder.disconnectedWhileRunning();
-                        btnConnect.setText(R.string.ConnectBTN);
+                    switch(SMB_STATUS){
+                        case CONNECTION_SUCCESSFUL:
+                        case SHARE_FOUND:{
+                            if( RECORD_SERVICE == RECORDING ){
+                                customRecorder.stop();
+                                customRecorder.disconnectedWhileRunning();
+                            }
+                            new AsyncStopSMBConnection().execute();
+                            break;
+                        }
+                        case 0:
+                        case CONNECTION_FAILED:
+                        case DISCONNECTED:
+                        case SHARE_NOT_FOUND: {
+                            initConnection();
+                            connect();
+                            break;
+                        }
                     }
                 }
-                else {
+                else
                     editIPv4.setError("Wrong ip address");
-                }
             }
         });
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
+    public static long getFolderSize(java.io.File file) {
+        long size = 0;
+        if (file.isDirectory()) {
+            for (java.io.File child : Objects.requireNonNull(file.listFiles())) {
+                size += getFolderSize(child);
+            }
+        } else {
+            size = file.length();
+        }
+        return size;
     }
 
     private void checkPermissions() {
@@ -189,17 +236,29 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initConnection() {
-        smbConnection = new smbConnection(this);
+        smbConnection = new smbConnection();
         SMBConnectionCallback smbConnectionCallback = new SMBConnectionCallback() {
             @Override
             public void onConnectionSuccessful() {
-                setShareName();
+                SMB_STATUS = CONNECTION_SUCCESSFUL;
+                if(!current_ip.equals(editIPv4.getText()+""))
+                    skip_share_test = false;
+                if(!skip_share_test)
+                    shareNameAlertDialog();
+                updateUI();
+            }
+
+            @Override
+            public void onConnectionFailed() {
+                SMB_STATUS = CONNECTION_FAILED;
+                skip_share_test = false;
+                updateUI();
             }
         };
         smbConnection.setSMBConnectionCallback(smbConnectionCallback);
     }
 
-    private void setShareName() {
+    private void shareNameAlertDialog() {
         final AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Insert the name of the share to connect to:");
 
@@ -292,17 +351,16 @@ public class MainActivity extends AppCompatActivity {
 
     private void connect() {
         sharedPreferences.edit().putString("ip",ip).apply();
+        current_ip = ip;
         String user = sharedPreferences.getString("user", "");
         String password = sharedPreferences.getString("password", "");
-
         String[] params = {ip, port, user, password, shareName};
         smbConnection.execute(params);
-        btnConnect.setText(R.string.DisconnectBTN);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     private void enableAudio(){
-        // re-enable sound after recording.
+        // re-enable sound after RECORD_SERVICE.
         ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_ALARM,false);
         ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_DTMF,false);
         ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_MUSIC,false);
@@ -313,7 +371,7 @@ public class MainActivity extends AppCompatActivity {
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     private void disableAudio() {
-        // disable sound when recording.
+        // disable sound when RECORD_SERVICE.
         ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_ALARM,true);
         ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_DTMF,true);
         ((AudioManager) Objects.requireNonNull(this.getApplicationContext().getSystemService(Context.AUDIO_SERVICE))).setStreamMute(AudioManager.STREAM_MUSIC,true);
@@ -323,20 +381,22 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    private class AsyncTestShareName extends AsyncTask<Void, Void, String> {
+    private class AsyncTestShareName extends AsyncTask<Void, Void, Integer> {
 
         @Override
-        protected String doInBackground(Void... strings) {
+        protected Integer doInBackground(Void... strings) {
             DiskShare diskShare;
             File destFile = null;
-            String result = SHARE_FOUND;
+            int result = SHARE_FOUND;
             try{
                 diskShare = (DiskShare) smbConnection.connect(shareName);
                 Set<FileAttributes> fileAttributes = new HashSet<>();
                 fileAttributes.add(FileAttributes.FILE_ATTRIBUTE_NORMAL);
                 Set<SMB2CreateOptions> createOptions = new HashSet<>();
                 createOptions.add(SMB2CreateOptions.FILE_RANDOM_ACCESS);
-                destFile = diskShare.openFile("testRW",
+                if(!diskShare.folderExists("SMB_REC"))
+                    diskShare.mkdir("SMB_REC");
+                destFile = diskShare.openFile(".mounted_in_SMB_Sec_Camera",
                         new HashSet<>(Collections.singletonList(AccessMask.GENERIC_ALL)),
                         fileAttributes,
                         SMB2ShareAccess.ALL,
@@ -352,12 +412,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @Override
-        protected void onPostExecute(String s) {
+        protected void onPostExecute(Integer s) {
             super.onPostExecute(s);
-            if(s.equals(SHARE_NOT_FOUND)){
-                textConnectionStatus.setTextColor(Color.RED);
-                textConnectionStatus.setText(R.string.err_sharenotfound);
-            }
+            SMB_STATUS = s;
+            if(s==SHARE_FOUND)
+                skip_share_test = true;
+            updateUI();
         }
     }
 
@@ -366,37 +426,102 @@ public class MainActivity extends AppCompatActivity {
         @RequiresApi(api = Build.VERSION_CODES.KITKAT)
         @Override
         protected Void doInBackground(Void... voids) {
-            java.io.File tmpVideo = customRecorder.getFile();
+
+            java.io.File sourceLocation = getApplicationContext().getCacheDir();
             DiskShare diskShare = (DiskShare) smbConnection.getSession().connectShare(shareName);
             Set<FileAttributes> fileAttributes = new HashSet<>();
             fileAttributes.add(FileAttributes.FILE_ATTRIBUTE_NORMAL);
             Set<SMB2CreateOptions> createOptions = new HashSet<>();
             createOptions.add(SMB2CreateOptions.FILE_RANDOM_ACCESS);
-            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss",Locale.getDefault()).format(new Date());
-            String path =  "REC_" + timeStamp + ".mp4";
-            File destFile = diskShare.openFile(path,
-                    new HashSet<>(Collections.singletonList(AccessMask.GENERIC_ALL)),
-                    fileAttributes,
-                    SMB2ShareAccess.ALL,
-                    SMB2CreateDisposition.FILE_OVERWRITE_IF,
-                    createOptions);
+            String path = "SMB_REC" ;
 
-            try (InputStream in = new FileInputStream(tmpVideo)) {
-                try (OutputStream out = destFile.getOutputStream()) {
-                    // Transfer bytes from in to out
-                    byte[] buf = new byte[1024];
-                    int len;
-                    while ((len = in.read(buf)) > 0) {
-                        out.write(buf, 0, len);
+            if ( sourceLocation.isDirectory()) {
+                String[] children = sourceLocation.list();
+                for (int i=0; i<children.length; i++) {
+
+                    String file_name = children[i];
+                    File destFile = diskShare.openFile(path + java.io.File.separator + file_name,
+                            new HashSet<>(Collections.singletonList(AccessMask.GENERIC_ALL)),
+                            fileAttributes,
+                            SMB2ShareAccess.ALL,
+                            SMB2CreateDisposition.FILE_OVERWRITE_IF,
+                            createOptions);
+                    try (InputStream in = new FileInputStream(sourceLocation + java.io.File.separator + children[i])) {
+                        try (OutputStream out = destFile.getOutputStream()) {
+                            // Transfer bytes from in to out
+                            byte[] buf = new byte[1024];
+                            int len;
+                            while ((len = in.read(buf)) > 0) {
+                                out.write(buf, 0, len);
+                            }
+                            out.close();
+                            in.close();
+                        }
+                        if( !(new java.io.File(sourceLocation + java.io.File.separator + children[i]).delete()) ) Log.w(TAG,"Something went wrong.");
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
                 }
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
             }
-            if(!tmpVideo.delete()) Log.w(TAG,"Something went wrong.");
             return null;
+        }
+    }
+
+    private void updateUI(){
+        switch(SMB_STATUS){
+            case CONNECTION_SUCCESSFUL:
+            case SHARE_FOUND: {
+                textConnectionStatus.setText("Connected");
+                textConnectionStatus.setTextColor(Color.GREEN);
+                btnConnect.setText(R.string.DisconnectBTN);
+                break;
+            }
+            case DISCONNECTED:{
+                textConnectionStatus.setText("Disconnected");
+                textConnectionStatus.setTextColor(Color.RED);
+                btnConnect.setText(R.string.ConnectBTN);
+                break;
+            }
+            case SHARE_NOT_FOUND:{
+                btnConnect.setText(R.string.ConnectBTN);
+                textConnectionStatus.setTextColor(Color.RED);
+                textConnectionStatus.setText(R.string.err_sharenotfound);
+                break;
+            }
+            case CONNECTION_FAILED:{
+                btnConnect.setText(R.string.ConnectBTN);
+                textConnectionStatus.setTextColor(Color.RED);
+                textConnectionStatus.setText(R.string.err_connfailed);
+                break;
+            }
+        }
+        switch(RECORD_SERVICE){
+            case RECORDING:{
+                textRecordingStatus.setText("RECORDING");
+                textRecordingStatus.setTextColor(Color.RED);
+                btnRecord.setText(R.string.stop_service);
+                break;
+            }
+            case SERVICE_RUNNING:{
+                textRecordingStatus.setText("Service running");
+                textRecordingStatus.setTextColor(Color.GREEN);
+                btnRecord.setText(R.string.stop_service);
+                break;
+            }
+            case SERVICE_STOPPED:{
+                textRecordingStatus.setText("Not running");
+                textRecordingStatus.setTextColor(Color.BLUE);
+                btnRecord.setText(R.string.start_service);
+                break;
+            }
+            case SERVICE_PAUSED:{
+                textRecordingStatus.setText("Paused");
+                textRecordingStatus.setTextColor(Color.BLUE);
+                btnRecord.setText(R.string.start_service);
+                break;
+            }
         }
     }
 }

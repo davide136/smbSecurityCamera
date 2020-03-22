@@ -1,11 +1,8 @@
 package com.d136.smbsecuritycamera;
 
-import android.app.Activity;
-import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.util.Log;
-import android.widget.TextView;
 
 import androidx.annotation.RequiresApi;
 
@@ -13,31 +10,21 @@ import com.hierynomus.smbj.SMBClient;
 import com.hierynomus.smbj.auth.AuthenticationContext;
 import com.hierynomus.smbj.connection.Connection;
 import com.hierynomus.smbj.session.Session;
-import com.hierynomus.smbj.share.DiskShare;
 
 import java.io.IOException;
 
-public class smbConnection extends AsyncTask<String, Void, Void> {
+public class smbConnection extends AsyncTask<String, Void, Session> {
 
     final static String TAG = "smbConnection";
-
+    private Session ySession = null;
     private boolean isSuccessful =  false;
-    private Session mSession;
-    private TextView status;
-    private Activity mActivity;
-    private Connection mConnection;
-    private AuthenticationContext mAc;
     private SMBConnectionCallback smbConnectionCallback;
-
-
-    smbConnection(Activity mainActivity) {
-        mActivity = mainActivity;
-    }
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
-    protected Void doInBackground(String... strings) {
+    protected Session doInBackground(String... strings) {
         String ip = strings[0];
+        Session mSession = null;
         int port = 445;
         try{
             port = Integer.valueOf(strings[1]);
@@ -49,53 +36,45 @@ public class smbConnection extends AsyncTask<String, Void, Void> {
 
         SMBClient client = new SMBClient();
 
-        mAc = new AuthenticationContext(user, password.toCharArray(), ip);
+        AuthenticationContext mAc = new AuthenticationContext(user, password.toCharArray(), ip);
         try{
-            mConnection = client.connect(ip,port);
+            Connection mConnection = client.connect(ip, port);
             mSession = mConnection.authenticate(mAc);
             isSuccessful = true;
         } catch (IOException e) {e.printStackTrace();}
-        return null;
+        return mSession;
     }
 
     @Override
-    protected void onPostExecute(Void session) {
+    protected void onPostExecute(Session session) {
         super.onPostExecute(session);
-        if (smbConnectionCallback != null )
+        if (smbConnectionCallback != null && isSuccessful && session != null){
             smbConnectionCallback.onConnectionSuccessful();
-        updateUI();
+            ySession = session;
+        }
+        else {
+            assert smbConnectionCallback != null;
+            smbConnectionCallback.onConnectionFailed();
+            ySession = session;
+        }
     }
 
-    public void setSMBConnectionCallback(SMBConnectionCallback smbConnectionCallback){
+    void setSMBConnectionCallback(SMBConnectionCallback smbConnectionCallback){
         this.smbConnectionCallback = smbConnectionCallback;
     }
 
-    public void updateUI() {
-        status = mActivity.findViewById(R.id.textConnectionStatus);
-        if(!isSuccessful) {
-            status.setText("Disconnected");
-            status.setTextColor(Color.RED);
-            return;
-        }
-        status.setText("Connected");
-        status.setTextColor(Color.GREEN);
-    }
+    Session getSession(){return ySession;}
 
-    public boolean isConnected(){ return isSuccessful; }
-
-    Session getSession(){return mSession;}
-
-    public void stop() {
+    void stop() {
         isSuccessful=false;
         try {
-            mSession.close();
-        } catch (IOException e) {
+            ySession.close();
+        } catch (Exception e) {
             e.printStackTrace();
         }
-        updateUI();
     }
 
-    public Object connect(String shareName) {
-        return mSession.connectShare(shareName);
+    Object connect(String shareName) {
+        return ySession.connectShare(shareName);
     }
 }
