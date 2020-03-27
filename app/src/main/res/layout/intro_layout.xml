@@ -76,60 +76,6 @@
 
         </LinearLayout>
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="30dp"
-                android:layout_marginTop="40dp"
-                android:layout_marginRight="30dp"
-                android:layout_weight="1"
-                android:text="Read external storage"
-                android:textSize="18sp" />
-
-            <Switch
-                android:id="@+id/switch_read_ext_storage"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="40dp"
-                android:layout_marginTop="40dp"
-                android:layout_marginRight="40dp"
-                android:layout_weight="1"
-                android:gravity="center" />
-
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="30dp"
-                android:layout_marginTop="40dp"
-                android:layout_marginRight="30dp"
-                android:layout_weight="1"
-                android:text="Read external storage"
-                android:textSize="18sp" />
-
-            <Switch
-                android:id="@+id/switch_write_ext_storage"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="40dp"
-                android:layout_marginTop="40dp"
-                android:layout_marginRight="40dp"
-                android:layout_weight="1"
-                android:gravity="center" />
-
-        </LinearLayout>
-
     </LinearLayout>
 
 

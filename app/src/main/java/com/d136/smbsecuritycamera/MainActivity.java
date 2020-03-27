@@ -88,13 +88,11 @@ public class MainActivity extends AppCompatActivity {
         ip = sharedPreferences.getString("ip","");
         if(!ip.equals(""))
             editIPv4.setText(ip);
-        checkPermissions();
         initConnection();
 
         customRecorder = new CustomRecorder(
                 preview,
                 this,
-                textRecordingStatus,
                 sharedPreferences
         );
         customRecorder.setCustomRecorderCallback(new CustomRecorderCallbacks() {
@@ -111,7 +109,7 @@ public class MainActivity extends AppCompatActivity {
             @RequiresApi(api = Build.VERSION_CODES.KITKAT)
             @Override
             public void onFileSaved() {
-                if( getFolderSize(getApplicationContext().getCacheDir()) / (1024*1024) > 0 )  //more than 100 Megabytes
+                if( getFolderSize(getApplicationContext().getCacheDir()) / (1024*1024) > 100 )  //more than 100 Megabytes
                     new AsyncCopyToSMB().execute();
                 customRecorder.reset();
                 RECORD_SERVICE = SERVICE_RUNNING;
@@ -128,6 +126,11 @@ public class MainActivity extends AppCompatActivity {
             public void recordStarted() {
                 RECORD_SERVICE = RECORDING;
                 updateUI();
+            }
+
+            @Override
+            public boolean isConnected() {
+                return SMB_STATUS == CONNECTION_SUCCESSFUL || SMB_STATUS == SHARE_FOUND;
             }
         });
 
@@ -222,16 +225,11 @@ public class MainActivity extends AppCompatActivity {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-                != PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED
         )
         {
             Intent intent = new Intent(MainActivity.this, IntroActivity.class);
             startActivity(intent);
-            super.finish();
         }
     }
 
@@ -306,6 +304,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        checkPermissions();
         try{
             disableAudio();
         }catch (Exception ignore){}
@@ -446,7 +445,8 @@ public class MainActivity extends AppCompatActivity {
                             SMB2ShareAccess.ALL,
                             SMB2CreateDisposition.FILE_OVERWRITE_IF,
                             createOptions);
-                    try (InputStream in = new FileInputStream(sourceLocation + java.io.File.separator + children[i])) {
+                    try (InputStream in = new FileInputStream(sourceLocation + java.io.File.separator +
+                            children[i])) {
                         try (OutputStream out = destFile.getOutputStream()) {
                             // Transfer bytes from in to out
                             byte[] buf = new byte[1024];
@@ -457,13 +457,20 @@ public class MainActivity extends AppCompatActivity {
                             out.close();
                             in.close();
                         }
-                        if( !(new java.io.File(sourceLocation + java.io.File.separator + children[i]).delete()) ) Log.w(TAG,"Something went wrong.");
+                        if( !(new java.io.File(sourceLocation + java.io.File.separator +
+                                children[i]).delete()) )
+                            Log.w(TAG,"Something went wrong.");
                     } catch (FileNotFoundException e) {
                         e.printStackTrace();
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
                 }
+            }
+            try {
+                diskShare.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
             return null;
         }

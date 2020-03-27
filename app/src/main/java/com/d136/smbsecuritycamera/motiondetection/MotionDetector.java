@@ -5,9 +5,11 @@ import android.content.pm.PackageManager;
 import android.hardware.Camera;
 import android.os.Handler;
 import android.util.Log;
+import android.view.Display;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.WindowManager;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -143,13 +145,6 @@ public class MotionDetector {
             }
         }
 
-        public void stoP() {
-            running = false;
-            // you might also want to interrupt() the Thread that is
-            // running this Runnable, too, or perhaps call:
-            resumE();
-            // to unblock
-        }
     }
 
     private final AggregateLumaMotionDetection detector;

@@ -6,4 +6,5 @@ public interface CustomRecorderCallbacks {
     void onFileSaved();
     void onPrepareFailed();
     void recordStarted();
+    boolean isConnected();
 }

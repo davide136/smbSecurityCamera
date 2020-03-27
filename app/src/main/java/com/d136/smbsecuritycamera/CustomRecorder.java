@@ -2,14 +2,12 @@ package com.d136.smbsecuritycamera;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.hardware.Camera;
 import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.os.Handler;
 import android.util.Log;
 import android.view.SurfaceView;
-import android.widget.TextView;
 
 import com.d136.smbsecuritycamera.motiondetection.MotionDetector;
 import com.d136.smbsecuritycamera.motiondetection.MotionDetectorCallback;
@@ -27,8 +25,6 @@ class CustomRecorder {
     private MotionDetector motionDetector;
     private Context context;
     private CustomRecorderCallbacks customRecorderCallbacks;
-    private TextView textRecordingStatus;
-    private int time;
     private java.io.File file;
 
 
@@ -36,17 +32,16 @@ class CustomRecorder {
     //CONSTRUCTOR
     CustomRecorder(SurfaceView preview,
                    Context context,
-                   TextView textRecordingStatus,
                    SharedPreferences sharedPreferences){
         this.context = context;
-        this.textRecordingStatus = textRecordingStatus;
         this.sharedPreferences = sharedPreferences;
         motionDetector = new MotionDetector(context,preview);
         motionDetector.setMotionDetectorCallback(new MotionDetectorCallback() {
             @Override
             public void onMotionDetected() {
                 Log.w(TAG,"MOTION DETECTED");
-                if(!recording)
+                boolean isConnected = customRecorderCallbacks.isConnected();
+                if(!recording && isConnected )
                     start();
             }
 
@@ -63,10 +58,10 @@ class CustomRecorder {
     }
 
     private void start(){
-        time = Integer.valueOf(sharedPreferences.getString("time","5"));
+        int time = Integer.valueOf(sharedPreferences.getString("time", "5"));
         motionDetector.setCheckInterval(Integer.valueOf(sharedPreferences.getString("frequency","500")));
-        motionDetector.setLeniency(Integer.valueOf(sharedPreferences.getString("tolerance","20")));
-        motionDetector.setMinLuma(Integer.valueOf(sharedPreferences.getString("luma","1000")));
+        motionDetector.setLeniency(sharedPreferences.getInt("tolerance", 20));
+        motionDetector.setMinLuma(sharedPreferences.getInt("luma", 1000));
         prepareVideoRecorder();
         recorder.start();
         recording = true;
@@ -78,11 +73,9 @@ class CustomRecorder {
                 if(recording)
                     customRecorderCallbacks.onTimePassed();
             }
-        }, time*1000);
+        }, time *1000);
 
     }
-
-    java.io.File getFile(){ return file; }
 
     private void getOutputMediaFile(){
         java.io.File mediaStorageDir = new java.io.File(String.valueOf(context.getCacheDir()));
@@ -114,6 +107,10 @@ class CustomRecorder {
 
         // Step 3: Set a CamcorderProfile (requires API Level 8 or higher)
         recorder.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH));
+        CharSequence size_char = sharedPreferences.getString("quality","640x480");
+        recorder.setVideoSize(
+                Integer.valueOf(size_char.toString().split("x")[0]),
+                Integer.valueOf(size_char.toString().split("x")[1]));
 
         // Step 4: Set output file
         getOutputMediaFile();
@@ -143,14 +140,10 @@ class CustomRecorder {
     }
 
     void startService() {
-//        textRecordingStatus.setText(R.string.ServiceStarted);
-//        textRecordingStatus.setTextColor(Color.GREEN);
         motionDetector.resumeDetection();
     }
 
     void pauseService() {
-//        textRecordingStatus.setText(R.string.ServicePaused);
-//        textRecordingStatus.setTextColor(Color.BLUE);
         recording = false;
         cameraLocked = true;
         if(recorder!=null)

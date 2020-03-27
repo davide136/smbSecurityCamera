@@ -1,44 +1,75 @@
-<PreferenceScreen
-    xmlns:app="http://schemas.android.com/apk/res-auto">
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
 
     <SwitchPreferenceCompat
+        app:iconSpaceReserved="false"
         app:key="portEnabled"
-        app:title="Custom port number"/>
+        app:title="Custom port number" />
 
     <EditTextPreference
         app:key="port"
         app:title="Port number"
         app:defaultValue="445"
-        app:summary="445"/>
+        app:summary="445"
+        app:iconSpaceReserved="false"
+        />
 
     <EditTextPreference
         app:key="user"
         app:title="Username"
-        app:summary=""/>
+        app:summary=""
+        app:iconSpaceReserved="false"
+        />
 
     <EditTextPreference
         app:key="password"
         app:title="Password"
-        app:summary=""/>
+        app:summary=""
+        app:iconSpaceReserved="false"
+        app:allowDividerBelow="true"
+        />
 
     <EditTextPreference
-        app:key="time"
-        app:title="Recording duration"
-        app:summary=""/>
-
-    <EditTextPreference
+        app:allowDividerAbove="true"
         app:key="frequency"
-        app:title="Frequency for motion detection"
-        app:summary=""/>
+        app:title="Frequency for motion detection in milliseconds"
+        app:summary=""
+        app:iconSpaceReserved="false"
+        />
 
-    <EditTextPreference
+    <SeekBarPreference
         app:key="tolerance"
         app:title="Difference tolerance for motion detection"
-        app:summary=""/>
+        app:min="5"
+        android:max="35"
+        app:iconSpaceReserved="false"
+        />
 
-    <EditTextPreference
+    <SeekBarPreference
         app:key="luma"
         app:title="Light tolerance for motion detection"
-        app:summary=""/>
+        app:min="500"
+        android:max="2000"
+        app:iconSpaceReserved="false"
+        />
 
+    <EditTextPreference
+        app:dialogMessage="When cache limit is reached all the files stored will be moved to the connected SMB server."
+        app:iconSpaceReserved="false"
+        app:key="cache_size"
+        app:summary="When cache limit is reached all the files stored will be moved to the connected SMB server."
+        app:title="Cache limit in MB" />
+
+    <EditTextPreference
+        app:allowDividerAbove="true"
+        app:iconSpaceReserved="false"
+        app:key="time"
+        app:summary=""
+        app:title="Recording duration in seconds." />
+    <com.d136.smbsecuritycamera.preferences.DynamicPreference
+        app:key="quality"
+        app:title="Video Quality"
+        app:iconSpaceReserved="false"
+        />
 </PreferenceScreen>
