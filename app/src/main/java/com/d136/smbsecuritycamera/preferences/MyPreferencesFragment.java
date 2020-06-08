@@ -12,7 +12,7 @@ import androidx.preference.SeekBarPreference;
 import com.d136.smbsecuritycamera.R;
 
 public class MyPreferencesFragment extends PreferenceFragmentCompat {
-    private static String TAG = "PreferenceFragment";
+    private final static String TAG = "PreferenceFragment";
     private Preference portPref;
 
     @Override
@@ -33,7 +33,7 @@ public class MyPreferencesFragment extends PreferenceFragmentCompat {
             @Override
             public boolean onPreferenceChange(Preference preference, Object newValue) {
                 try{
-                    int check = Integer.valueOf(newValue.toString());
+                    int check = Integer.parseInt(newValue.toString());
                 }catch(Exception e){return false;}
                 preference.setSummary(newValue+"");
                 return true;
@@ -87,7 +87,7 @@ public class MyPreferencesFragment extends PreferenceFragmentCompat {
             @Override
             public boolean onPreferenceChange(Preference preference, Object newValue) {
                 try{
-                    int temp = Integer.valueOf((String) newValue);
+                    int temp = Integer.parseInt((String) newValue);
                 }catch(Exception e){
                     preference.setSummary(newValue+" is not a valid input. Set to 5 seconds.");
                     timePref.getSharedPreferences().edit().putString("time","5").apply();
@@ -106,7 +106,7 @@ public class MyPreferencesFragment extends PreferenceFragmentCompat {
             @Override
             public boolean onPreferenceChange(Preference preference, Object newValue) {
                 try{
-                    int temp = Integer.valueOf((String) newValue);
+                    int temp = Integer.parseInt((String) newValue);
                 }catch(Exception e){
                     preference.setSummary(newValue+" is not a valid input. Set to 500 milli seconds.");
                     timePref.getSharedPreferences().edit().putString("frequency","500").apply();
@@ -158,7 +158,7 @@ public class MyPreferencesFragment extends PreferenceFragmentCompat {
             @Override
             public boolean onPreferenceChange(Preference preference, Object newValue) {
                 try{
-                    int temp = Integer.valueOf((String) newValue);
+                    int temp = Integer.parseInt((String) newValue);
                 }catch(Exception e){
                     preference.setSummary(newValue+" is not a valid input. Default to 100 MB.");
                     cache_size_pref.getSharedPreferences().edit().putString("cache_size","100").apply();

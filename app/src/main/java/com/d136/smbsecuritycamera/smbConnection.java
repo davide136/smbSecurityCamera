@@ -15,7 +15,7 @@ import java.io.IOException;
 
 public class smbConnection extends AsyncTask<String, Void, Session> {
 
-    final static String TAG = "smbConnection";
+    private final static String TAG = "smbConnection";
     private Session ySession = null;
     private boolean isSuccessful =  false;
     private SMBConnectionCallback smbConnectionCallback;
@@ -27,7 +27,7 @@ public class smbConnection extends AsyncTask<String, Void, Session> {
         Session mSession = null;
         int port = 445;
         try{
-            port = Integer.valueOf(strings[1]);
+            port = Integer.parseInt(strings[1]);
         }catch(Exception e){
             Log.e(TAG, "Port selected is not valid! Using default.");
         }

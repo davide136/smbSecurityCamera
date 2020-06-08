@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".MainActivity"
     android:orientation="vertical"
-    android:keepScreenOn="true">
+    android:keepScreenOn="true"
+    android:background="@color/colorPrimary">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -18,32 +20,30 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="0dp"
             android:text="@string/header" />
-
 
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
             android:layout_gravity="center"
-            android:text="@string/enter_ip_v4_address" />
+            android:layout_marginTop="8dp"
+            android:text="@string/enter_ip_v4_address"
+            android:textSize="22sp" />
 
 
         <EditText
             android:id="@+id/editIPv4"
-            android:layout_width="181dp"
-            android:layout_height="47dp"
-            android:layout_marginLeft="20dp"
 
+            android:layout_width="150dp"
+            android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:layout_marginTop="20dp"
-            android:ems="10"
-            android:hint="@string/ip_address"
-            android:inputType="textPersonName"
             android:layout_marginStart="20dp"
-            android:importantForAutofill="no" />
+            android:layout_marginTop="20dp"
+            android:hint="@string/ip_address"
+            android:importantForAutofill="no"
+            android:inputType="textPersonName" />
 
         <Button
             android:id="@+id/btnConnect"
@@ -79,9 +79,9 @@
                 android:id="@+id/textConnectionStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="30dp"
                 android:layout_marginLeft="30dp"
-                android:text="@android:string/unknownName"
-                android:layout_marginStart="30dp" />
+                android:text="@android:string/unknownName" />
 
         </LinearLayout>
 
@@ -101,18 +101,18 @@
                 android:id="@+id/textRecordingStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="30dp"
                 android:layout_marginLeft="30dp"
-                android:text="@android:string/unknownName"
-                android:layout_marginStart="30dp" />
+                android:text="@android:string/unknownName" />
 
         </LinearLayout>
 
         <SurfaceView
+            android:id="@+id/surfaceView"
             android:layout_width="250dp"
             android:layout_height="150dp"
-            android:layout_marginTop="20dp"
             android:layout_gravity="center"
-            android:id="@+id/surfaceView" />
+            android:layout_marginTop="20dp" />
 
     </LinearLayout>
 

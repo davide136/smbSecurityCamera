@@ -1,12 +1,10 @@
 package com.d136.smbsecuritycamera.preferences;
 
 
-
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.hardware.Camera;
 import android.util.AttributeSet;
-import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.ListAdapter;
 import android.widget.ListView;

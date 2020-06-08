@@ -71,18 +71,23 @@ public class MainActivity extends AppCompatActivity {
     private SharedPreferences sharedPreferences;
     private CustomRecorder customRecorder;
     private boolean skip_share_test = false;
+    private Context context;
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        context = this;
         this.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+
         //init layout
         editIPv4 = findViewById(R.id.editIPv4);
         btnConnect = findViewById(R.id.btnConnect);
         btnRecord = findViewById(R.id.btnRecord);
         textConnectionStatus = findViewById(R.id.textConnectionStatus);
         textRecordingStatus = findViewById(R.id.textRecordingStatus);
-        SurfaceView preview = findViewById(R.id.surfaceView);
+        final SurfaceView preview = findViewById(R.id.surfaceView);
+
+
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         port = sharedPreferences.getString("port","445");
         ip = sharedPreferences.getString("ip","");
@@ -160,27 +165,12 @@ public class MainActivity extends AppCompatActivity {
                 updateUI();
             }
         });
-
         btnConnect.setOnClickListener(new View.OnClickListener() {
-            class AsyncStopSMBConnection extends AsyncTask<Void,Void,Void> {
-                @Override
-                protected Void doInBackground(Void... voids) {
-                    smbConnection.stop();
-                    return null;
-                }
-
-                @Override
-                protected void onPostExecute(Void aVoid) {
-                    super.onPostExecute(aVoid);
-                    SMB_STATUS = DISCONNECTED;
-                    updateUI();
-                }
-            }
 
             @Override
             public void onClick(View v) {
                 ip = editIPv4.getText().toString();
-                if(validIP(ip)){
+                if(validIP(ip, context)){
                     switch(SMB_STATUS){
                         case CONNECTION_SUCCESSFUL:
                         case SHARE_FOUND:{
@@ -188,7 +178,7 @@ public class MainActivity extends AppCompatActivity {
                                 customRecorder.stop();
                                 customRecorder.disconnectedWhileRunning();
                             }
-                            new AsyncStopSMBConnection().execute();
+                            new MainActivity.AsyncStopSMBConnection().execute();
                             break;
                         }
                         case 0:
@@ -286,13 +276,13 @@ public class MainActivity extends AppCompatActivity {
         builder.show();
     }
 
-    private static boolean validIP(String ip) {
+    private static boolean validIP(String ip, Context context) {
         if (ip == null || ip.isEmpty()) return false;
         ip = ip.trim();
         if (ip.length() < 6 & ip.length() > 15) return false;
 
         try {
-            Pattern pattern = Pattern.compile("^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$");
+            Pattern pattern = Pattern.compile(context.getString(R.string.IP_PATTERN_CHECKER));
             Matcher matcher = pattern.matcher(ip);
             return matcher.matches();
         } catch (PatternSyntaxException ex) {
@@ -436,9 +426,9 @@ public class MainActivity extends AppCompatActivity {
 
             if ( sourceLocation.isDirectory()) {
                 String[] children = sourceLocation.list();
-                for (int i=0; i<children.length; i++) {
+                assert children != null;
+                for (String file_name : children) {
 
-                    String file_name = children[i];
                     File destFile = diskShare.openFile(path + java.io.File.separator + file_name,
                             new HashSet<>(Collections.singletonList(AccessMask.GENERIC_ALL)),
                             fileAttributes,
@@ -446,7 +436,7 @@ public class MainActivity extends AppCompatActivity {
                             SMB2CreateDisposition.FILE_OVERWRITE_IF,
                             createOptions);
                     try (InputStream in = new FileInputStream(sourceLocation + java.io.File.separator +
-                            children[i])) {
+                            file_name)) {
                         try (OutputStream out = destFile.getOutputStream()) {
                             // Transfer bytes from in to out
                             byte[] buf = new byte[1024];
@@ -457,9 +447,9 @@ public class MainActivity extends AppCompatActivity {
                             out.close();
                             in.close();
                         }
-                        if( !(new java.io.File(sourceLocation + java.io.File.separator +
-                                children[i]).delete()) )
-                            Log.w(TAG,"Something went wrong.");
+                        if (!(new java.io.File(sourceLocation + java.io.File.separator +
+                                file_name).delete()))
+                            Log.w(TAG, "Something went wrong.");
                     } catch (FileNotFoundException e) {
                         e.printStackTrace();
                     } catch (IOException e) {
@@ -480,13 +470,13 @@ public class MainActivity extends AppCompatActivity {
         switch(SMB_STATUS){
             case CONNECTION_SUCCESSFUL:
             case SHARE_FOUND: {
-                textConnectionStatus.setText("Connected");
+                textConnectionStatus.setText(R.string.CONNECTED_OK);
                 textConnectionStatus.setTextColor(Color.GREEN);
                 btnConnect.setText(R.string.DisconnectBTN);
                 break;
             }
             case DISCONNECTED:{
-                textConnectionStatus.setText("Disconnected");
+                textConnectionStatus.setText(R.string.DISCONNECTED);
                 textConnectionStatus.setTextColor(Color.RED);
                 btnConnect.setText(R.string.ConnectBTN);
                 break;
@@ -506,29 +496,44 @@ public class MainActivity extends AppCompatActivity {
         }
         switch(RECORD_SERVICE){
             case RECORDING:{
-                textRecordingStatus.setText("RECORDING");
+                textRecordingStatus.setText(R.string.STATUS_RECORDING);
                 textRecordingStatus.setTextColor(Color.RED);
                 btnRecord.setText(R.string.stop_service);
                 break;
             }
             case SERVICE_RUNNING:{
-                textRecordingStatus.setText("Service running");
+                textRecordingStatus.setText(R.string.STATUS_SERVICE_RUNNING);
                 textRecordingStatus.setTextColor(Color.GREEN);
                 btnRecord.setText(R.string.stop_service);
                 break;
             }
             case SERVICE_STOPPED:{
-                textRecordingStatus.setText("Not running");
+                textRecordingStatus.setText(R.string.STATUS_SERVICE_NOT_RUNNING);
                 textRecordingStatus.setTextColor(Color.BLUE);
                 btnRecord.setText(R.string.start_service);
                 break;
             }
             case SERVICE_PAUSED:{
-                textRecordingStatus.setText("Paused");
+                textRecordingStatus.setText(R.string.STATUS_SERVICE_PAUSED);
                 textRecordingStatus.setTextColor(Color.BLUE);
                 btnRecord.setText(R.string.start_service);
                 break;
             }
+        }
+    }
+
+    class AsyncStopSMBConnection extends AsyncTask<Void,Void,Void> {
+        @Override
+        protected Void doInBackground(Void... voids) {
+            smbConnection.stop();
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void aVoid) {
+            super.onPostExecute(aVoid);
+            SMB_STATUS = DISCONNECTED;
+            updateUI();
         }
     }
 }
